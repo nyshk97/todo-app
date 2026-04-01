@@ -34,15 +34,13 @@ struct TodoWidgetView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(entry.todos) { todo in
                         HStack(spacing: 8) {
-                            Image(systemName: todo.completed ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 14))
-                                .foregroundStyle(todo.completed ? .green : .primary)
+                            widgetCheckbox(todo.completed)
 
                             Text(todo.title)
-                                .font(.system(size: 14))
+                                .font(.system(size: 13))
                                 .strikethrough(todo.completed)
-                                .foregroundStyle(todo.completed ? .secondary : .primary)
-                                .lineLimit(1)
+                                .foregroundStyle(todo.completed ? Color(.systemGray) : Color(.darkGray))
+                                .lineLimit(2)
                         }
                     }
                 }
@@ -50,6 +48,22 @@ struct TodoWidgetView: View {
             }
         }
         .padding(4)
+    }
+
+    private func widgetCheckbox(_ completed: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
+                .frame(width: 13, height: 13)
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .stroke(completed ? Color.clear : Color(.systemGray4), lineWidth: 1)
+                .frame(width: 13, height: 13)
+            if completed {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color(white: 0.3))
+            }
+        }
     }
 
     private var headerView: some View {

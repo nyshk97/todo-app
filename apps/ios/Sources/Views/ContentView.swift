@@ -122,16 +122,16 @@ struct ContentView: View {
 
     private func checkboxIcon(_ completed: Bool) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(completed ? Color(red: 0.93, green: 0.65, blue: 0.15) : .white)
-                .frame(width: 14, height: 14)
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
+                .frame(width: 15, height: 15)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .stroke(completed ? Color.clear : Color(.systemGray4), lineWidth: 1.2)
-                .frame(width: 14, height: 14)
+                .frame(width: 15, height: 15)
             if completed {
                 Image(systemName: "checkmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(white: 0.3))
             }
         }
     }
