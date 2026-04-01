@@ -216,6 +216,18 @@ wrangler d1 create todo-app-db
 
 ---
 
+## Phase 8: iOS アプリ配布
+
+### 8-1. 配布方法の選定
+
+- 現在は Personal Team 証明書で実機インストール（7日で期限切れ）
+- 候補:
+  - **AltStore**: Mac に AltServer を常駐させ、Wi-Fi 経由で7日ごとに自動再署名
+  - **Sideloadly**: 手動で `.ipa` を再インストール（自動化なし）
+  - **TestFlight**: Apple Developer Program ($99/年) に加入し、自分だけに配布（90日有効）
+
+---
+
 ## 注意事項
 
 - XcodeGen を使うことで Xcode の GUI 操作なしでプロジェクト生成が可能
