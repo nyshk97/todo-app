@@ -85,6 +85,7 @@ struct ContentView: View {
                 // 完了済みタスク
                 ForEach(viewModel.completedTodos) { todo in
                     todoRow(todo)
+                        .id("done-\(todo.id)")
                 }
             }
         }
@@ -97,7 +98,14 @@ struct ContentView: View {
             if viewModel.isLoading {
                 ProgressView()
             } else if viewModel.todos.isEmpty && !viewModel.canAddTask {
-                ContentUnavailableView("タスクなし", systemImage: "checkmark.circle")
+                VStack(spacing: 12) {
+                    Text("—")
+                        .font(.system(size: 40, weight: .ultraLight))
+                        .foregroundStyle(Color(.systemGray3))
+                    Text("No tasks")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(Color(.systemGray2))
+                }
             }
         }
     }
