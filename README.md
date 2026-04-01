@@ -1,6 +1,6 @@
 # Todo App
 
-DayTask にインスパイアされた個人用 ToDo アプリ。iOS / macOS / API のモノレポ構成。
+[DayTask](https://apps.apple.com/jp/app/daytask-seize-your-day/id6760099687) にインスパイアされた個人用 ToDo アプリ。iOS / macOS / API のモノレポ構成。
 
 ## スクリーンショット
 
