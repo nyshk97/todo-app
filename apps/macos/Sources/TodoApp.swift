@@ -11,6 +11,11 @@ struct TodoApp: App {
     }
 }
 
+class KeyablePanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: NSPanel!
@@ -23,7 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panel.orderOut(nil)
         }))
 
-        panel = NSPanel(
+        panel = KeyablePanel(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 520),
             styleMask: [.nonactivatingPanel, .resizable],
             backing: .buffered,
