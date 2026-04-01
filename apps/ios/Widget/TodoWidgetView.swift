@@ -44,10 +44,10 @@ struct TodoWidgetView: View {
                         }
                     }
                 }
-                Spacer(minLength: 0)
             }
         }
-        .padding(4)
+        .padding(.horizontal, 0)
+        .padding(.vertical, -4)
     }
 
     private func widgetCheckbox(_ completed: Bool) -> some View {

@@ -186,7 +186,7 @@ struct ContentView: View {
                 let vertical = value.translation.height
                 guard abs(horizontal) > abs(vertical) else { return }
 
-                if horizontal < 0 {
+                if horizontal > 0 {
                     viewModel.goToPreviousDay()
                 } else {
                     viewModel.goToNextDay()
