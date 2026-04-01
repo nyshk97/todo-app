@@ -11,7 +11,7 @@ struct ContentView: View {
             headerView
             todoListView
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color(red: 0.96, green: 0.95, blue: 0.91))
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
@@ -32,18 +32,25 @@ struct ContentView: View {
             .frame(maxWidth: .infinity)
 
             HStack {
+                Button {
+                    viewModel.goToPreviousDay()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.title2)
+                        .foregroundStyle(.primary)
+                }
+                Spacer()
                 if !viewModel.isToday {
                     Button {
                         viewModel.goToNextDay()
                     } label: {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: "chevron.right")
                             .font(.title2)
                             .foregroundStyle(.primary)
                     }
                 }
-                Spacer()
             }
-            .padding(.leading, 16)
+            .padding(.horizontal, 16)
         }
         .padding(.vertical, 20)
     }
@@ -84,8 +91,8 @@ struct ContentView: View {
         .scrollIndicators(.hidden)
         .background(Color(red: 1.0, green: 0.97, blue: 0.88))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
         .padding(.horizontal, 16)
-        .padding(.bottom, 16)
         .overlay {
             if viewModel.isLoading {
                 ProgressView()
@@ -99,11 +106,10 @@ struct ContentView: View {
 
     private var addTaskRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: "square")
-                .font(.title2)
-                .foregroundStyle(.quaternary)
+            checkboxIcon(false).opacity(0.4)
 
             TextField("Add a task", text: $viewModel.newTaskTitle)
+                .font(.system(size: 15))
                 .focused($isInputFocused)
                 .onSubmit {
                     Task {
@@ -111,6 +117,22 @@ struct ContentView: View {
                         isInputFocused = true
                     }
                 }
+        }
+    }
+
+    private func checkboxIcon(_ completed: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(completed ? Color(red: 0.93, green: 0.65, blue: 0.15) : .white)
+                .frame(width: 14, height: 14)
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(completed ? Color.clear : Color(.systemGray4), lineWidth: 1.2)
+                .frame(width: 14, height: 14)
+            if completed {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+            }
         }
     }
 
@@ -122,15 +144,14 @@ struct ContentView: View {
                 guard viewModel.editable else { return }
                 Task { await viewModel.toggleCompleted(todo) }
             } label: {
-                Image(systemName: todo.completed ? "checkmark.square.fill" : "square")
-                    .font(.title2)
-                    .foregroundStyle(todo.completed ? .orange : Color(.systemGray3))
+                checkboxIcon(todo.completed)
             }
             .buttonStyle(.plain)
 
             Text(todo.title)
+                .font(.system(size: 15))
                 .strikethrough(todo.completed)
-                .foregroundStyle(todo.completed ? .secondary : .primary)
+                .foregroundStyle(todo.completed ? Color(.systemGray) : Color(.darkGray))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 20)
