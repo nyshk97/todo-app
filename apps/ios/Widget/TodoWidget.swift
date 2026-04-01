@@ -6,6 +6,7 @@ struct TodoEntry: TimelineEntry {
     let todos: [WidgetTodo]
     let totalCount: Int
     let completedCount: Int
+    let errorMessage: String?
 }
 
 struct WidgetTodo: Identifiable {
@@ -22,11 +23,16 @@ struct TodoProvider: TimelineProvider {
                 WidgetTodo(id: "1", title: "タスクを追加しよう", completed: false),
             ],
             totalCount: 1,
-            completedCount: 0
+            completedCount: 0,
+            errorMessage: nil
         )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (TodoEntry) -> Void) {
+        if context.isPreview {
+            completion(placeholder(in: context))
+            return
+        }
         Task {
             let entry = await fetchEntry()
             completion(entry)
@@ -36,7 +42,6 @@ struct TodoProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoEntry>) -> Void) {
         Task {
             let entry = await fetchEntry()
-            // 15分後に次の更新
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: .now)!
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
@@ -54,10 +59,17 @@ struct TodoProvider: TimelineProvider {
                 date: .now,
                 todos: Array(todos),
                 totalCount: response.todos.count,
-                completedCount: completedCount
+                completedCount: completedCount,
+                errorMessage: nil
             )
         } catch {
-            return TodoEntry(date: .now, todos: [], totalCount: 0, completedCount: 0)
+            return TodoEntry(
+                date: .now,
+                todos: [],
+                totalCount: 0,
+                completedCount: 0,
+                errorMessage: error.localizedDescription
+            )
         }
     }
 }

@@ -9,7 +9,18 @@ struct TodoWidgetView: View {
             headerView
                 .padding(.bottom, 8)
 
-            if entry.todos.isEmpty {
+            if let error = entry.errorMessage {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                    Spacer()
+                }
+                Spacer()
+            } else if entry.todos.isEmpty {
                 Spacer()
                 HStack {
                     Spacer()
