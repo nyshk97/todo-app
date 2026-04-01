@@ -71,14 +71,15 @@ struct TodoWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today")
                     .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color(.darkGray))
                 Text(dateString)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(.systemGray))
             }
             Spacer()
             Text("\(entry.completedCount)/\(entry.totalCount)")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color(.systemGray))
         }
     }
 

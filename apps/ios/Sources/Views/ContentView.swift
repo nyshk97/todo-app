@@ -25,9 +25,10 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Text(viewModel.dateLabel)
                     .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Color(.darkGray))
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(.systemGray))
             }
             .frame(maxWidth: .infinity)
 
@@ -37,7 +38,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.title2)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color(.darkGray))
                 }
                 Spacer()
                 if !viewModel.isToday {
@@ -46,7 +47,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "chevron.right")
                             .font(.title2)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color(.darkGray))
                     }
                 }
             }
