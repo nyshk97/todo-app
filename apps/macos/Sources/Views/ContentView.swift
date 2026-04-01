@@ -1,9 +1,11 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var viewModel = TodoViewModel()
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
+    @State private var draggingTodoId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +61,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 16)
+        .background(WindowDragView())
     }
 
     // MARK: - List
@@ -70,6 +73,15 @@ struct ContentView: View {
                 // 未完了タスク
                 ForEach(viewModel.uncompletedTodos) { todo in
                     todoRow(todo)
+                        .onDrag {
+                            draggingTodoId = todo.id
+                            return NSItemProvider(object: todo.id as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: TodoDropDelegate(
+                            todoId: todo.id,
+                            viewModel: viewModel,
+                            draggingTodoId: $draggingTodoId
+                        ))
                 }
 
                 // インライン入力欄
@@ -201,5 +213,51 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Drop Delegate
+
+struct TodoDropDelegate: DropDelegate {
+    let todoId: String
+    let viewModel: TodoViewModel
+    @Binding var draggingTodoId: String?
+
+    func performDrop(info: DropInfo) -> Bool {
+        viewModel.syncReorder()
+        draggingTodoId = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingId = draggingTodoId, draggingId != todoId else { return }
+        withAnimation(.default) {
+            viewModel.moveTodo(fromId: draggingId, toId: todoId)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        true
+    }
+}
+
+// MARK: - Window Drag Handle
+
+struct WindowDragView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = WindowDragNSView()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+class WindowDragNSView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }
