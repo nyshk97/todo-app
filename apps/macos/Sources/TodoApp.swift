@@ -11,36 +11,85 @@ struct TodoApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
+    private var panel: NSPanel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Dock アイコンを非表示
         NSApp.setActivationPolicy(.accessory)
 
-        // ポップオーバー
-        popover = NSPopover()
-        popover.contentSize = NSSize(width: 360, height: 520)
-        popover.behavior = .transient
-        popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: ContentView())
+        // フローティングパネル
+        let contentView = NSHostingView(rootView: PanelContentView(onClose: { [weak self] in
+            self?.panel.orderOut(nil)
+        }))
+
+        panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 520),
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .hudWindow],
+            backing: .buffered,
+            defer: false
+        )
+        panel.contentView = contentView
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isMovableByWindowBackground = true
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.minSize = NSSize(width: 300, height: 400)
+
+        // 右下に配置
+        positionAtBottomRight()
+        panel.orderFront(nil)
 
         // メニューバーアイコン
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo")
-            button.action = #selector(togglePopover)
+            button.action = #selector(togglePanel)
         }
     }
 
-    @objc func togglePopover() {
-        guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
+    private func positionAtBottomRight() {
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let x = screenFrame.maxX - panel.frame.width - 16
+        let y = screenFrame.minY + 16
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
+    @objc func togglePanel() {
+        if panel.isVisible {
+            panel.orderOut(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            panel.orderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
+// MARK: - Panel Content View (with close button)
+
+struct PanelContentView: View {
+    var onClose: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            ContentView()
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color(.systemGray))
+                    .frame(width: 20, height: 20)
+                    .background(Color(.systemGray).opacity(0.15))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(8)
         }
     }
 }
