@@ -61,6 +61,7 @@ struct ContentView: View {
     private var todoListView: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
+                Spacer().frame(height: 8)
                 // 未完了タスク
                 ForEach(viewModel.uncompletedTodos) { todo in
                     todoRow(todo)
@@ -80,7 +81,7 @@ struct ContentView: View {
                 if viewModel.canAddTask {
                     addTaskRow
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 10)
                 }
 
                 // 完了済みタスク
@@ -115,10 +116,13 @@ struct ContentView: View {
 
     private var addTaskRow: some View {
         HStack(spacing: 12) {
-            checkboxIcon(false).opacity(0.4)
+            Image(systemName: "plus")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(.systemGray2))
 
-            TextField("Add a task", text: $viewModel.newTaskTitle)
+            TextField("Add a task", text: $viewModel.newTaskTitle, prompt: Text("Add a task").foregroundStyle(Color(.systemGray2)))
                 .font(.system(size: 15))
+                .foregroundStyle(Color(.darkGray))
                 .focused($isInputFocused)
                 .onSubmit {
                     Task {
@@ -135,7 +139,7 @@ struct ContentView: View {
                 .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
                 .frame(width: 15, height: 15)
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(completed ? Color.clear : Color(.systemGray4), lineWidth: 1.2)
+                .stroke(completed ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1.2)
                 .frame(width: 15, height: 15)
             if completed {
                 Image(systemName: "checkmark")
@@ -164,7 +168,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
         .contentShape(Rectangle())
         .contextMenu {
             if viewModel.editable {

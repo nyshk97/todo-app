@@ -56,7 +56,7 @@ struct TodoWidgetView: View {
                 .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
                 .frame(width: 13, height: 13)
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .stroke(completed ? Color.clear : Color(.systemGray4), lineWidth: 1)
+                .stroke(completed ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1)
                 .frame(width: 13, height: 13)
             if completed {
                 Image(systemName: "checkmark")
