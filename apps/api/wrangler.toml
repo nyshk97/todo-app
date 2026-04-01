@@ -5,5 +5,5 @@ compatibility_date = "2025-04-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "todo-app-db"
-database_id = "local" # wrangler d1 create 後に本番IDに置き換える
+database_id = "7804f6e8-8e57-4ae8-b857-da24d7f6897a"
 migrations_dir = "migrations"
