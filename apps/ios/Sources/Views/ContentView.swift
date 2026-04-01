@@ -88,7 +88,6 @@ struct ContentView: View {
                             viewModel: viewModel,
                             draggingTodoId: $draggingTodoId
                         ))
-                        .opacity(draggingTodoId == todo.id ? 0.5 : 1)
                 }
 
                 // インライン入力欄
@@ -201,16 +200,15 @@ struct ContentView: View {
                         .foregroundStyle(Color(.systemGray2))
                 }
             } else if viewModel.editable && !todo.completed {
-                Button {
-                    editingTodoId = todo.id
-                    editingTitle = todo.title
-                } label: {
-                    Text(todo.title)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(.darkGray))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
+                Text(todo.title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color(.darkGray))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        editingTodoId = todo.id
+                        editingTitle = todo.title
+                    }
             } else {
                 Text(todo.title)
                     .font(.system(size: 15))
