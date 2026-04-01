@@ -1,0 +1,44 @@
+[tasks.generate]
+description = "Xcode プロジェクト生成"
+run = "bash scripts/generate-projects.sh"
+
+[tasks.dev]
+description = "API ローカル開発サーバー起動"
+run = "cd apps/api && npm run dev"
+
+[tasks.test]
+description = "API テスト実行"
+run = "cd apps/api && npm test"
+
+[tasks.deploy]
+description = "API を本番にデプロイ"
+run = "cd apps/api && npx wrangler deploy"
+
+[tasks."deploy:migrate"]
+description = "本番 DB にマイグレーション適用"
+run = "cd apps/api && npx wrangler d1 migrations apply todo-app-db --remote"
+
+[tasks.build]
+description = "macOS アプリを Release ビルド"
+run = "bash scripts/build.sh"
+
+[tasks.release]
+description = "GitHub Release 作成 (例: mise run release -- 1.2.0)"
+run = "bash scripts/release.sh {{arg(name='version')}}"
+
+[tasks."build:ios"]
+description = "iOS アプリをビルド (実機)"
+run = """
+bash scripts/generate-projects.sh
+cd apps/ios
+xcodebuild build -project TodoApp.xcodeproj -scheme TodoApp -destination 'generic/platform=iOS' -quiet
+"""
+
+[tasks."build:mac"]
+description = "macOS アプリをビルドして起動"
+run = """
+bash scripts/generate-projects.sh
+cd apps/macos
+xcodebuild build -project TodoMac.xcodeproj -scheme TodoMac -destination 'platform=macOS' CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO -quiet
+open $(find ~/Library/Developer/Xcode/DerivedData -name "TodoMac.app" -type d | head -1)
+"""
