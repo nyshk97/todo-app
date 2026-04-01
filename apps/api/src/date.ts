@@ -1,11 +1,19 @@
+function toJST(date: Date): Date {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000);
+}
+
+function formatDate(date: Date): string {
+  return toJST(date).toISOString().slice(0, 10);
+}
+
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return formatDate(new Date());
 }
 
 export function yesterday(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return formatDate(d);
 }
 
 export function daysAgo(date: string): number {
