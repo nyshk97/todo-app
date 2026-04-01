@@ -19,3 +19,4 @@ targets:
         SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_LSUIElement: true
