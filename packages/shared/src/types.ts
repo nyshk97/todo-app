@@ -5,6 +5,7 @@ export interface Todo {
   completed: boolean;
   position: number;
   carried_over: boolean;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

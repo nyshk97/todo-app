@@ -62,6 +62,7 @@ todos.get("/", async (c) => {
       completed: row.completed === 1,
       position: row.position,
       carried_over: row.carried_over === 1,
+      completed_at: row.completed_at ?? null,
       created_at: row.created_at,
       updated_at: row.updated_at,
     })),
@@ -104,6 +105,7 @@ todos.post("/", async (c) => {
       ...todo,
       completed: (todo as Record<string, unknown>).completed === 1,
       carried_over: (todo as Record<string, unknown>).carried_over === 1,
+      completed_at: (todo as Record<string, unknown>).completed_at ?? null,
     },
     201
   );
@@ -138,6 +140,12 @@ todos.patch("/:id", async (c) => {
   if (body.completed !== undefined) {
     updates.push("completed = ?");
     values.push(body.completed ? 1 : 0);
+    if (body.completed) {
+      updates.push("completed_at = ?");
+      values.push(new Date().toISOString());
+    } else {
+      updates.push("completed_at = NULL");
+    }
   }
   if (body.position !== undefined) {
     updates.push("position = ?");
@@ -165,6 +173,7 @@ todos.patch("/:id", async (c) => {
     ...updated,
     completed: (updated as Record<string, unknown>).completed === 1,
     carried_over: (updated as Record<string, unknown>).carried_over === 1,
+    completed_at: (updated as Record<string, unknown>).completed_at ?? null,
   });
 });
 
