@@ -124,10 +124,16 @@ struct ContentView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(Color(.darkGray))
                 .focused($isInputFocused)
+                .submitLabel(.done)
                 .onSubmit {
-                    Task {
-                        await viewModel.addTodo()
-                        isInputFocused = true
+                    let title = viewModel.newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if title.isEmpty {
+                        isInputFocused = false
+                    } else {
+                        Task {
+                            await viewModel.addTodo()
+                            isInputFocused = true
+                        }
                     }
                 }
         }
