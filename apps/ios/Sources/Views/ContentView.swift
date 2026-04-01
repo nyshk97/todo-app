@@ -11,6 +11,7 @@ struct ContentView: View {
             headerView
             todoListView
         }
+        .background(Color(.systemGroupedBackground))
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
@@ -20,14 +21,30 @@ struct ContentView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        VStack(spacing: 4) {
-            Text(viewModel.dateLabel)
-                .font(.system(size: 34, weight: .bold))
-            Text(viewModel.dateSubLabel)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        ZStack {
+            VStack(spacing: 4) {
+                Text(viewModel.dateLabel)
+                    .font(.system(size: 34, weight: .bold))
+                Text(viewModel.dateSubLabel)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack {
+                if !viewModel.isToday {
+                    Button {
+                        viewModel.goToNextDay()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.title2)
+                            .foregroundStyle(.primary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.leading, 16)
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
     }
 
@@ -54,8 +71,8 @@ struct ContentView: View {
                 // インライン入力欄
                 if viewModel.canAddTask {
                     addTaskRow
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 14)
                 }
 
                 // 完了済みタスク
@@ -64,6 +81,11 @@ struct ContentView: View {
                 }
             }
         }
+        .scrollIndicators(.hidden)
+        .background(Color(red: 1.0, green: 0.97, blue: 0.88))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
         .overlay {
             if viewModel.isLoading {
                 ProgressView()
@@ -77,7 +99,7 @@ struct ContentView: View {
 
     private var addTaskRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: "circle")
+            Image(systemName: "square")
                 .font(.title2)
                 .foregroundStyle(.quaternary)
 
@@ -100,9 +122,9 @@ struct ContentView: View {
                 guard viewModel.editable else { return }
                 Task { await viewModel.toggleCompleted(todo) }
             } label: {
-                Image(systemName: todo.completed ? "checkmark.circle.fill" : "circle")
+                Image(systemName: todo.completed ? "checkmark.square.fill" : "square")
                     .font(.title2)
-                    .foregroundStyle(todo.completed ? .green : .primary)
+                    .foregroundStyle(todo.completed ? .orange : Color(.systemGray3))
             }
             .buttonStyle(.plain)
 
@@ -111,9 +133,8 @@ struct ContentView: View {
                 .foregroundStyle(todo.completed ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .contentShape(Rectangle())
         .contextMenu {
             if viewModel.editable {
