@@ -12,6 +12,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.96, green: 0.95, blue: 0.91))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .task {
             await viewModel.loadTodos()
         }

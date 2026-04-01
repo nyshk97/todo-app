@@ -25,7 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 520),
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .hudWindow],
+            styleMask: [.nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -34,10 +34,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true
-        panel.titlebarAppearsTransparent = true
-        panel.titleVisibility = .hidden
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.hasShadow = true
         panel.minSize = NSSize(width: 300, height: 400)
 
         // 右下に配置
