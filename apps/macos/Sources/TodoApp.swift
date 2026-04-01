@@ -70,6 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             panel.orderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: .panelDidShow, object: nil)
         }
     }
 }
@@ -96,4 +97,8 @@ struct PanelContentView: View {
             .padding(8)
         }
     }
+}
+
+extension Notification.Name {
+    static let panelDidShow = Notification.Name("panelDidShow")
 }
