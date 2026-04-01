@@ -10,7 +10,6 @@ final class TodoViewModel {
     var isLoading: Bool = false
     var error: String?
     var newTaskTitle: String = ""
-    var showingAddTask: Bool = false
 
     private let api = APIClient.shared
     private let calendar = Calendar.current
@@ -71,7 +70,6 @@ final class TodoViewModel {
         let title = newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         newTaskTitle = ""
-        showingAddTask = false
         do {
             let todo = try await api.createTodo(title: title)
             todos.append(todo)

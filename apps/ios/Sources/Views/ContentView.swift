@@ -2,31 +2,16 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = TodoViewModel()
-    @GestureState private var dragOffset: CGFloat = 0
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                headerView
-                todoListView
-            }
-            .gesture(swipeGesture)
-
-            if viewModel.canAddTask {
-                addButton
-            }
+        VStack(spacing: 0) {
+            headerView
+            todoListView
         }
+        .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
-        }
-        .alert("タスクを追加", isPresented: $viewModel.showingAddTask) {
-            TextField("タスク名", text: $viewModel.newTaskTitle)
-            Button("追加") {
-                Task { await viewModel.addTodo() }
-            }
-            Button("キャンセル", role: .cancel) {
-                viewModel.newTaskTitle = ""
-            }
         }
     }
 
@@ -48,20 +33,23 @@ struct ContentView: View {
 
     private var todoListView: some View {
         List {
-            if !viewModel.uncompletedTodos.isEmpty {
-                Section {
-                    ForEach(viewModel.uncompletedTodos) { todo in
-                        todoRow(todo)
+            Section {
+                ForEach(viewModel.uncompletedTodos) { todo in
+                    todoRow(todo)
+                }
+                .onMove { source, destination in
+                    viewModel.moveTodos(from: source, to: destination)
+                }
+                .onDelete { indexSet in
+                    for index in indexSet {
+                        let todo = viewModel.uncompletedTodos[index]
+                        Task { await viewModel.deleteTodo(todo) }
                     }
-                    .onMove { source, destination in
-                        viewModel.moveTodos(from: source, to: destination)
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            let todo = viewModel.uncompletedTodos[index]
-                            Task { await viewModel.deleteTodo(todo) }
-                        }
-                    }
+                }
+
+                // インライン入力欄
+                if viewModel.canAddTask {
+                    addTaskRow
                 }
             }
 
@@ -83,11 +71,33 @@ struct ContentView: View {
         .overlay {
             if viewModel.isLoading {
                 ProgressView()
-            } else if viewModel.todos.isEmpty {
+            } else if viewModel.todos.isEmpty && !viewModel.canAddTask {
                 ContentUnavailableView("タスクなし", systemImage: "checkmark.circle")
             }
         }
     }
+
+    // MARK: - Inline Add
+
+    private var addTaskRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "circle")
+                .font(.title2)
+                .foregroundStyle(.quaternary)
+
+            TextField("Add a task", text: $viewModel.newTaskTitle)
+                .focused($isInputFocused)
+                .onSubmit {
+                    Task {
+                        await viewModel.addTodo()
+                        // 追加後にフォーカスを維持して連続入力可能に
+                        isInputFocused = true
+                    }
+                }
+        }
+    }
+
+    // MARK: - Todo Row
 
     private func todoRow(_ todo: Todo) -> some View {
         Button {
@@ -107,23 +117,6 @@ struct ContentView: View {
         .disabled(!viewModel.editable)
     }
 
-    // MARK: - Add Button
-
-    private var addButton: some View {
-        Button {
-            viewModel.showingAddTask = true
-        } label: {
-            Image(systemName: "plus")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(.green, in: Circle())
-                .shadow(radius: 4, y: 2)
-        }
-        .padding(24)
-    }
-
     // MARK: - Swipe Gesture
 
     private var swipeGesture: some Gesture {
@@ -134,10 +127,8 @@ struct ContentView: View {
                 guard abs(horizontal) > abs(vertical) else { return }
 
                 if horizontal < 0 {
-                    // Left swipe → previous day
                     viewModel.goToPreviousDay()
                 } else {
-                    // Right swipe → next day (towards today)
                     viewModel.goToNextDay()
                 }
             }
