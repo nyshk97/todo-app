@@ -5,6 +5,9 @@ struct ContentView: View {
     @State private var viewModel = TodoViewModel()
     @FocusState private var isInputFocused: Bool
     @State private var draggingTodoId: String?
+    @State private var editingTodoId: String?
+    @State private var editingTitle: String = ""
+    @State private var menuTodo: Todo?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +18,17 @@ struct ContentView: View {
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
+        }
+        .confirmationDialog("タスクを削除しますか？", isPresented: Binding(
+            get: { menuTodo != nil },
+            set: { if !$0 { menuTodo = nil } }
+        )) {
+            if let todo = menuTodo {
+                Button("削除", role: .destructive) {
+                    Task { await viewModel.deleteTodo(todo) }
+                    menuTodo = nil
+                }
+            }
         }
     }
 
@@ -167,24 +181,47 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
 
-            Text(todo.title)
-                .font(.system(size: 15))
-                .strikethrough(todo.completed)
-                .foregroundStyle(todo.completed ? Color(.systemGray) : Color(.darkGray))
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if editingTodoId == todo.id {
+                TextField("", text: $editingTitle)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color(.darkGray))
+                    .submitLabel(.done)
+                    .onSubmit {
+                        let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !title.isEmpty && title != todo.title {
+                            Task { await viewModel.updateTitle(id: todo.id, title: title) }
+                        }
+                        editingTodoId = nil
+                    }
+                Button {
+                    menuTodo = todo
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(.systemGray2))
+                }
+            } else if viewModel.editable && !todo.completed {
+                Button {
+                    editingTodoId = todo.id
+                    editingTitle = todo.title
+                } label: {
+                    Text(todo.title)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(.darkGray))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(todo.title)
+                    .font(.system(size: 15))
+                    .strikethrough(todo.completed)
+                    .foregroundStyle(Color(.systemGray))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
-        .contextMenu {
-            if viewModel.editable {
-                Button(role: .destructive) {
-                    Task { await viewModel.deleteTodo(todo) }
-                } label: {
-                    Label("削除", systemImage: "trash")
-                }
-            }
-        }
     }
 
     // MARK: - Swipe Gesture
