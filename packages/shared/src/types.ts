@@ -1,0 +1,30 @@
+export interface Todo {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  completed: boolean;
+  position: number;
+  carried_over: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTodoRequest {
+  title: string;
+}
+
+export interface UpdateTodoRequest {
+  title?: string;
+  completed?: boolean;
+  position?: number;
+}
+
+export interface ReorderRequest {
+  items: { id: string; position: number }[];
+}
+
+export interface TodosResponse {
+  todos: Todo[];
+  date: string;
+  editable: boolean;
+}
