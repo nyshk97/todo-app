@@ -12,9 +12,9 @@ dist/
 # Xcode / Swift
 DerivedData/
 .build/
+*.xcodeproj
 *.xcuserstate
 *.xcworkspace/xcuserdata/
-**/*.xcodeproj/xcuserdata/
 
 # macOS
 .DS_Store
