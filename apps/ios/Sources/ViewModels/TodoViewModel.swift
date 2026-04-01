@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WidgetKit
 
 @MainActor
 @Observable
@@ -73,6 +74,7 @@ final class TodoViewModel {
         do {
             let todo = try await api.createTodo(title: title)
             todos.append(todo)
+            reloadWidget()
         } catch {
             self.error = error.localizedDescription
         }
@@ -85,6 +87,7 @@ final class TodoViewModel {
             if let i = todos.firstIndex(where: { $0.id == todo.id }) {
                 todos[i] = updated
             }
+            reloadWidget()
         } catch {
             self.error = error.localizedDescription
         }
@@ -95,6 +98,7 @@ final class TodoViewModel {
         do {
             try await api.deleteTodo(id: todo.id)
             todos.removeAll { $0.id == todo.id }
+            reloadWidget()
         } catch {
             self.error = error.localizedDescription
         }
@@ -120,10 +124,15 @@ final class TodoViewModel {
             }
             do {
                 try await api.reorderTodos(items: items)
+                reloadWidget()
             } catch {
                 self.error = error.localizedDescription
             }
         }
+    }
+
+    private func reloadWidget() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func goToPreviousDay() {
