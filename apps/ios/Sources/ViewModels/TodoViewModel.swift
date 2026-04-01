@@ -100,15 +100,20 @@ final class TodoViewModel {
         }
     }
 
-    func moveTodos(from source: IndexSet, to destination: Int) {
+    func moveTodo(fromId: String, toId: String) {
         var uncompleted = uncompletedTodos
-        uncompleted.move(fromOffsets: source, toOffset: destination)
+        guard let fromIndex = uncompleted.firstIndex(where: { $0.id == fromId }),
+              let toIndex = uncompleted.firstIndex(where: { $0.id == toId }),
+              fromIndex != toIndex else { return }
 
-        // Update local state immediately
-        let reordered = uncompleted + completedTodos
-        todos = reordered
+        let item = uncompleted.remove(at: fromIndex)
+        uncompleted.insert(item, at: toIndex)
 
-        // Send to API
+        todos = uncompleted + completedTodos
+    }
+
+    func syncReorder() {
+        let uncompleted = uncompletedTodos
         Task {
             let items = uncompleted.enumerated().map { (i, todo) in
                 (id: todo.id, position: i)

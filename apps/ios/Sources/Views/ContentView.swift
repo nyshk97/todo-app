@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var viewModel = TodoViewModel()
     @FocusState private var isInputFocused: Bool
+    @State private var draggingTodoId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,42 +34,36 @@ struct ContentView: View {
     // MARK: - List
 
     private var todoListView: some View {
-        List {
-            Section {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                // 未完了タスク
                 ForEach(viewModel.uncompletedTodos) { todo in
                     todoRow(todo)
-                }
-                .onMove { source, destination in
-                    viewModel.moveTodos(from: source, to: destination)
-                }
-                .onDelete { indexSet in
-                    for index in indexSet {
-                        let todo = viewModel.uncompletedTodos[index]
-                        Task { await viewModel.deleteTodo(todo) }
-                    }
+                        .onDrag {
+                            draggingTodoId = todo.id
+                            return NSItemProvider(object: todo.id as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: TodoDropDelegate(
+                            todoId: todo.id,
+                            viewModel: viewModel,
+                            draggingTodoId: $draggingTodoId
+                        ))
+                        .opacity(draggingTodoId == todo.id ? 0.5 : 1)
                 }
 
                 // インライン入力欄
                 if viewModel.canAddTask {
                     addTaskRow
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                 }
-            }
 
-            if !viewModel.completedTodos.isEmpty {
-                Section {
-                    ForEach(viewModel.completedTodos) { todo in
-                        todoRow(todo)
-                    }
-                    .onDelete { indexSet in
-                        for index in indexSet {
-                            let todo = viewModel.completedTodos[index]
-                            Task { await viewModel.deleteTodo(todo) }
-                        }
-                    }
+                // 完了済みタスク
+                ForEach(viewModel.completedTodos) { todo in
+                    todoRow(todo)
                 }
             }
         }
-        .listStyle(.plain)
         .overlay {
             if viewModel.isLoading {
                 ProgressView()
@@ -90,7 +86,6 @@ struct ContentView: View {
                 .onSubmit {
                     Task {
                         await viewModel.addTodo()
-                        // 追加後にフォーカスを維持して連続入力可能に
                         isInputFocused = true
                     }
                 }
@@ -100,21 +95,35 @@ struct ContentView: View {
     // MARK: - Todo Row
 
     private func todoRow(_ todo: Todo) -> some View {
-        Button {
-            guard viewModel.editable else { return }
-            Task { await viewModel.toggleCompleted(todo) }
-        } label: {
-            HStack(spacing: 12) {
+        HStack(spacing: 12) {
+            Button {
+                guard viewModel.editable else { return }
+                Task { await viewModel.toggleCompleted(todo) }
+            } label: {
                 Image(systemName: todo.completed ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(todo.completed ? .green : .primary)
+            }
+            .buttonStyle(.plain)
 
-                Text(todo.title)
-                    .strikethrough(todo.completed)
-                    .foregroundStyle(todo.completed ? .secondary : .primary)
+            Text(todo.title)
+                .strikethrough(todo.completed)
+                .foregroundStyle(todo.completed ? .secondary : .primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground))
+        .contentShape(Rectangle())
+        .contextMenu {
+            if viewModel.editable {
+                Button(role: .destructive) {
+                    Task { await viewModel.deleteTodo(todo) }
+                } label: {
+                    Label("削除", systemImage: "trash")
+                }
             }
         }
-        .disabled(!viewModel.editable)
     }
 
     // MARK: - Swipe Gesture
@@ -132,5 +141,34 @@ struct ContentView: View {
                     viewModel.goToNextDay()
                 }
             }
+    }
+}
+
+// MARK: - Drop Delegate
+
+struct TodoDropDelegate: DropDelegate {
+    let todoId: String
+    let viewModel: TodoViewModel
+    @Binding var draggingTodoId: String?
+
+    func performDrop(info: DropInfo) -> Bool {
+        viewModel.syncReorder()
+        draggingTodoId = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingId = draggingTodoId, draggingId != todoId else { return }
+        withAnimation(.default) {
+            viewModel.moveTodo(fromId: draggingId, toId: todoId)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func validateDrop(info: DropInfo) -> Bool {
+        true
     }
 }
