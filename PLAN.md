@@ -1,8 +1,8 @@
 # 実装計画
 
-## Phase 1: プロジェクト基盤
+## Phase 1: プロジェクト基盤 ✅
 
-### 1-1. モノレポ初期化
+### 1-1. モノレポ初期化 ✅
 
 - `git init`
 - `.gitignore` 作成（node_modules, .wrangler, .build, DerivedData 等）
@@ -18,7 +18,7 @@
   /shared
 ```
 
-### 1-2. apps/api セットアップ
+### 1-2. apps/api セットアップ ✅
 
 - `wrangler init` 相当の構成を手動で作成
   - `package.json`（hono, wrangler, typescript 等）
@@ -28,7 +28,7 @@
 - `npm install`
 - `wrangler dev` でローカル起動を確認
 
-### 1-3. packages/shared セットアップ
+### 1-3. packages/shared セットアップ ✅
 
 - `package.json`
 - `tsconfig.json`
@@ -37,137 +37,103 @@
 
 ---
 
-## Phase 2: DB とマイグレーション
+## Phase 2: DB とマイグレーション ✅
 
-### 2-1. D1 データベース作成
+### 2-1. D1 データベース作成 ✅
 
 ```bash
 wrangler d1 create todo-app-db
 ```
 
-- 出力される database_id を `wrangler.toml` に記載
+- database_id: `7804f6e8-8e57-4ae8-b857-da24d7f6897a`
+- リージョン: APAC
 
-### 2-2. 初期マイグレーション作成
+### 2-2. 初期マイグレーション作成 ✅
 
-`apps/api/migrations/0001_create_todos.sql`:
+`apps/api/migrations/0001_create_todos.sql`
 
-```sql
-CREATE TABLE todos (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  date TEXT NOT NULL,           -- YYYY-MM-DD
-  completed INTEGER NOT NULL DEFAULT 0,
-  position INTEGER NOT NULL DEFAULT 0,
-  carried_over INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+### 2-3. マイグレーション適用 ✅
 
-CREATE INDEX idx_todos_date ON todos(date);
-```
-
-### 2-3. マイグレーション適用
-
-```bash
-wrangler d1 migrations apply todo-app-db --local   # ローカル確認
-wrangler d1 migrations apply todo-app-db --remote  # 本番適用
-```
+- ローカル・リモート両方に適用済み
 
 ---
 
-## Phase 3: API 実装
+## Phase 3: API 実装 ✅
 
-### 3-1. 認証ミドルウェア
+### 3-1. 認証ミドルウェア ✅
 
-- Bearer トークン検証ミドルウェアを作成
-- `wrangler secret put API_SECRET` でシークレット登録
+- Bearer トークン検証ミドルウェア (`src/auth.ts`)
+- `wrangler secret put API_SECRET` でシークレット登録済み
 - 全エンドポイントに適用
 
-### 3-2. GET /todos?date=YYYY-MM-DD
+### 3-2. GET /todos?date=YYYY-MM-DD ✅
 
 - 指定日のタスク一覧を返す
 - date 未指定時は今日の日付をデフォルトにする
 - **今日の場合のみ**: 自動繰り越し処理を実行
-  - 今日のタスクが0件 かつ 前日に未完了タスクがある場合
-  - 前日の未完了タスクを今日の日付でコピー（`carried_over = 1`）
-  - 繰り越し元はそのまま残す
 - レスポンス: タスク一覧 + 日付の編集可否フラグ
 
-### 3-3. POST /todos
+### 3-3. POST /todos ✅
 
-- 新規タスク追加
-- date は今日の日付に固定（リクエストで指定不可）
-- `position` は既存タスクの最大値 + 1
+### 3-4. PATCH /todos/:id ✅
 
-### 3-4. PATCH /todos/:id
+### 3-5. DELETE /todos/:id ✅
 
-- タスクの更新（title, completed, position）
-- 対象タスクの date が今日または1日前でなければ 403
+### 3-6. PATCH /todos/reorder ✅
 
-### 3-5. DELETE /todos/:id
+### 3-7. テスト ✅
 
-- タスクの削除
-- 対象タスクの date が今日または1日前でなければ 403
+- date ユーティリティのユニットテスト (9件)
+- Miniflare を使った API 統合テスト (16件)
+- 全25テスト pass
 
-### 3-6. PATCH /todos/reorder
+### 3-8. デプロイ ✅
 
-- 並び順の一括更新（`[{ id, position }]` の配列を受け取る）
-- 今日のタスクのみ許可
-
-### 3-7. 動作確認
-
-- `wrangler dev` でローカル起動
-- curl で全エンドポイントをテスト
-  - タスク追加 → 一覧取得 → 完了切替 → 削除
-  - 日付制限の検証（過去タスクへの更新拒否）
-- デプロイ: `wrangler deploy`
-- 本番 URL で同様に curl テスト
+- URL: `https://todo-app-api.d0ne1s-todo.workers.dev`
+- curl で本番動作確認済み
 
 ---
 
-## Phase 4: iOS アプリ
+## Phase 4: iOS アプリ 🚧
 
-### 4-1. Xcode プロジェクト作成
+### 4-1. Xcode プロジェクト作成 ✅
 
-- `apps/ios/` に Swift Package として作成（CLI で `swift package init` は使わず、`xcodebuild` ベースで管理）
-- ただし iOS アプリは Xcode プロジェクトが必要なため、最小限の `.xcodeproj` を作成
-- SwiftUI の App エントリポイント作成
+- XcodeGen (`project.yml`) でプロジェクト生成（GUI 操作なし）
+- `xcodegen generate` → `.xcodeproj` 生成
+- シミュレータ (iPhone 17 Pro) でビルド・起動確認済み
 
-### 4-2. API クライアント
+### 4-2. API クライアント ✅
 
-- `URLSession` ベースのシンプルな API クライアント
+- `URLSession` ベースの `APIClient` (actor)
 - Bearer トークンをヘッダに付与
-- トークンは iOS の設定画面 or ハードコード（個人用なので）
 - レスポンスを Swift の `Codable` モデルにデコード
 
-### 4-3. メイン画面（今日のタスク）
+### 4-3. メイン画面（今日のタスク） ✅
 
 - 日付ヘッダー（"Today" + 日付文字列）
-- タスクリスト
-  - 未完了タスク: チェックボックス + タイトル
-  - 完了タスク: チェック済み + 打ち消し線 + グレーアウト（リスト下部）
+- タスクリスト（未完了 / 完了をセクション分け）
 - 右下に「+」ボタン → タスク追加
 - チェックボックスタップで完了切替
 - スワイプ削除
 
-### 4-4. 日付ナビゲーション（横スワイプ）
+### 4-4. 日付ナビゲーション（横スワイプ） ✅
 
-- `TabView` with `.tabViewStyle(.page)` または `ScrollView` + gesture で横スワイプ実装
+- `DragGesture` で横スワイプ実装
 - 左スワイプで前日、右スワイプで翌日（今日まで）
 - 日付ヘッダーの表示切替（"Today" / "Yesterday" / 日付）
 - 2日以上前は編集UI非表示（「+」ボタン非表示、チェックボックス無効化）
 
-### 4-5. ドラッグ&ドロップ並べ替え
+### 4-5. ドラッグ&ドロップ並べ替え ✅
 
 - `List` + `.onMove` で実装
 - 並べ替え後に API に position を送信
 
 ### 4-6. 動作確認
 
-- Xcode からシミュレータで起動
-- タスクの追加・完了・削除・並べ替えを確認
-- 日付スワイプの動作確認
-- 実機（iPhone）にインストールして確認
+- [x] シミュレータでビルド・起動
+- [ ] タスクの追加・完了・削除・並べ替えを実際に操作して確認
+- [ ] 日付スワイプの動作確認
+- [ ] 実機（iPhone）にインストールして確認
 
 ---
 
@@ -175,7 +141,7 @@ wrangler d1 migrations apply todo-app-db --remote  # 本番適用
 
 ### 5-1. Xcode プロジェクト作成
 
-- `apps/macos/` に macOS アプリとして作成
+- `apps/macos/` に XcodeGen でプロジェクト生成
 - iOS と共通のモデル・API クライアントコードは可能な範囲でコピー or Swift Package で共有
 
 ### 5-2. メイン画面
@@ -226,7 +192,7 @@ wrangler d1 migrations apply todo-app-db --remote  # 本番適用
 
 ## 注意事項
 
-- iOS / macOS のプロジェクト作成は Xcode の GUI 操作が最小限必要（初回のみ）
-  - それ以降のコード編集・ビルド・実機インストールは `xcodebuild` CLI で可能
+- XcodeGen を使うことで Xcode の GUI 操作なしでプロジェクト生成が可能
+- コード編集・ビルド・実機インストールは `xcodebuild` CLI で完結
 - 各 Phase 完了時にコミット・動作確認を行う
-- API は Phase 3 完了時点で本番デプロイし、以降のクライアント開発は本番 API に接続する
+- API は Phase 3 完了時点で本番デプロイ済み。クライアントは本番 API に接続する
