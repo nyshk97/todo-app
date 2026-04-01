@@ -7,7 +7,6 @@ struct ContentView: View {
     @State private var draggingTodoId: String?
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
-    @State private var menuTodo: Todo?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,17 +17,6 @@ struct ContentView: View {
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
-        }
-        .confirmationDialog("タスクを削除しますか？", isPresented: Binding(
-            get: { menuTodo != nil },
-            set: { if !$0 { menuTodo = nil } }
-        )) {
-            if let todo = menuTodo {
-                Button("削除", role: .destructive) {
-                    Task { await viewModel.deleteTodo(todo) }
-                    menuTodo = nil
-                }
-            }
         }
     }
 
@@ -193,7 +181,8 @@ struct ContentView: View {
                         editingTodoId = nil
                     }
                 Button {
-                    menuTodo = todo
+                    Task { await viewModel.deleteTodo(todo) }
+                    editingTodoId = nil
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 13))
