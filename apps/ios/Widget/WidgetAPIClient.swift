@@ -20,7 +20,7 @@ actor WidgetAPIClient {
     static let shared = WidgetAPIClient()
 
     private let baseURL = "https://todo-app-api.d0ne1s-todo.workers.dev"
-    private let secret = "done1s-todo-claudeflare-secret-desu"
+    private let secret = Secrets.apiSecret
 
     func fetchTodos() async throws -> WidgetTodosResponse {
         var req = URLRequest(url: URL(string: "\(baseURL)/todos")!)

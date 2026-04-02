@@ -4,7 +4,7 @@ actor APIClient {
     static let shared = APIClient()
 
     private let baseURL = "https://todo-app-api.d0ne1s-todo.workers.dev"
-    private let secret = "done1s-todo-claudeflare-secret-desu"
+    private let secret = Secrets.apiSecret
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()

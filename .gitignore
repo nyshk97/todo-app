@@ -25,3 +25,6 @@ build/
 # Environment
 .env
 .env.local
+
+# Generated secrets
+Secrets.swift
