@@ -52,7 +52,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo")
-            button.action = #selector(togglePanel)
+            button.action = #selector(statusItemClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
     }
 
@@ -64,7 +65,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    @objc func togglePanel() {
+    @objc func statusItemClicked(_ sender: NSStatusBarButton) {
+        guard let event = NSApp.currentEvent else { return }
+
+        if event.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            statusItem.menu = menu
+            statusItem.button?.performClick(nil)
+            // メニューを消した後、左クリックが効くように menu を外す
+            statusItem.menu = nil
+        } else {
+            togglePanel()
+        }
+    }
+
+    private func togglePanel() {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
