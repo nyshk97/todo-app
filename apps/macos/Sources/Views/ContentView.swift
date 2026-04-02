@@ -165,6 +165,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             Button {
                 guard viewModel.editable else { return }
+                editingTodoId = nil
                 Task { await viewModel.toggleCompleted(todo) }
             } label: {
                 checkboxIcon(todo.completed)
