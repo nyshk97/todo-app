@@ -15,6 +15,7 @@
 - DB マイグレーション: `apps/api/migrations/` に SQL ファイルを追加し `npx wrangler d1 migrations apply todo-app-db --remote` で適用
 - テストの DB スキーマ: `apps/api/src/__tests__/api.test.ts` 内に直書き。マイグレーション追加時はここも更新すること
 - 日付は JST (UTC+9) で計算。`apps/api/src/date.ts` の `toJST()` ヘルパーを使用
+- D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと
 
 ## iOS アプリ
 
@@ -34,6 +35,7 @@
 - `styleMask` に `.titled` や `.hudWindow` を含めるとダークなタイトルバーが出る。ボーダーレスにして角丸背景 + カスタム×ボタンで対応
 - パネル表示時に `NotificationCenter` 経由でデータを再読み込み
 - 署名なしでビルド: `CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO`
+- `isMovableByWindowBackground = true` だと `onDrag` が奪われる。ヘッダーのみに `WindowDragView`（NSViewRepresentable）を配置して対応
 
 ## ビルド・リリース
 
