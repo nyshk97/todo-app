@@ -80,6 +80,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 struct PanelContentView: View {
     var onClose: () -> Void
 
+    private var colors: AppColors { Theme.current }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             ContentView()
@@ -88,9 +90,9 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(colors.textSecondary)
                     .frame(width: 20, height: 20)
-                    .background(Color(.systemGray).opacity(0.15))
+                    .background(colors.closeButtonBackground)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
