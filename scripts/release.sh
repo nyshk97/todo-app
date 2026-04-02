@@ -12,10 +12,20 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build"
 ZIP_FILE="$BUILD_DIR/TodoMac.zip"
 
-# ビルド
-if [ ! -f "$ZIP_FILE" ]; then
-  bash "$REPO_ROOT/scripts/build.sh"
+# MARKETING_VERSION を更新
+sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$VERSION\"/" "$REPO_ROOT/apps/macos/project.yml"
+
+# バージョン更新をコミット
+cd "$REPO_ROOT"
+if ! git diff --quiet apps/macos/project.yml; then
+  git add apps/macos/project.yml
+  git commit -m "chore: macOSアプリのバージョンを$VERSIONに更新"
+  git push origin main
 fi
+
+# ビルド（常に再ビルド）
+rm -rf "$BUILD_DIR"
+bash "$REPO_ROOT/scripts/build.sh"
 
 # GitHub Release 作成
 gh release create "v$VERSION" "$ZIP_FILE" \
