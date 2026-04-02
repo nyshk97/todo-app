@@ -70,6 +70,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if event.type == .rightMouseUp {
             let menu = NSMenu()
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+            let versionItem = NSMenuItem(title: "v\(version)", action: nil, keyEquivalent: "")
+            versionItem.isEnabled = false
+            menu.addItem(versionItem)
+            menu.addItem(NSMenuItem.separator())
             menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
