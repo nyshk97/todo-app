@@ -27,6 +27,7 @@
 - `LazyVStack` で同じ ID を複数の `ForEach` で使うとキャッシュバグが起きる。完了済みタスクには `.id("done-\(todo.id)")` で回避
 - `contextMenu` は dimming バグがあるので使わない。タスク名タップで編集、ゴミ箱アイコンで即削除
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
+- 実機インストール: `mise run build:ios` で Xcode を開き、iPhone を選択して Cmd+R。CLI の `xcodebuild` は署名の認証情報が不足するため Xcode GUI 経由が必要
 
 ## macOS アプリ
 

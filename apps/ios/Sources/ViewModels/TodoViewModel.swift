@@ -61,6 +61,7 @@ final class TodoViewModel {
             let response = try await api.fetchTodos(date: dateString)
             todos = response.todos
             editable = response.editable
+            reloadWidget()
         } catch {
             self.error = error.localizedDescription
         }

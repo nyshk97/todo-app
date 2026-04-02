@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var draggingTodoId: String?
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,11 @@ struct ContentView: View {
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                Task { await viewModel.loadTodos() }
+            }
         }
     }
 

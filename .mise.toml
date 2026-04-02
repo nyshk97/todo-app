@@ -27,11 +27,10 @@ description = "GitHub Release 作成 (例: mise run release -- 1.2.0)"
 run = "bash scripts/release.sh {{arg(name='version')}}"
 
 [tasks."build:ios"]
-description = "iOS アプリをビルド (実機)"
+description = "iOS アプリを Xcode で開く (実機接続後 Cmd+R でインストール)"
 run = """
 bash scripts/generate-projects.sh
-cd apps/ios
-xcodebuild build -project TodoApp.xcodeproj -scheme TodoApp -destination 'generic/platform=iOS' -quiet
+open apps/ios/TodoApp.xcodeproj
 """
 
 [tasks."build:mac"]
