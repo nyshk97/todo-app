@@ -40,6 +40,13 @@ enum Theme {
         closeButtonBackground: Color.white.opacity(0.08)
     )
 
-    // TODO: 時刻判定で切り替え。今はナイトモード固定
-    static var current: AppColors { night }
+    static var current: AppColors {
+        isNightTime ? night : light
+    }
+
+    private static var isNightTime: Bool {
+        let jst = TimeZone(identifier: "Asia/Tokyo")!
+        let hour = Calendar.current.dateComponents(in: jst, from: Date()).hour ?? 0
+        return hour >= 22 || hour < 6
+    }
 }
