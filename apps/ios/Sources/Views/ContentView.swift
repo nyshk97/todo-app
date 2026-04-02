@@ -196,7 +196,7 @@ struct ContentView: View {
                         .foregroundStyle(Color(.systemGray2))
                 }
             } else if viewModel.editable && !todo.completed {
-                Text(todo.title)
+                linkedText(todo.title)
                     .font(.system(size: 15))
                     .foregroundStyle(Color(.darkGray))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -206,7 +206,7 @@ struct ContentView: View {
                         editingTitle = todo.title
                     }
             } else {
-                Text(todo.title)
+                linkedText(todo.title)
                     .font(.system(size: 15))
                     .strikethrough(todo.completed)
                     .foregroundStyle(Color(.systemGray))
