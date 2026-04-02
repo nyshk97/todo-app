@@ -3,6 +3,7 @@ import WidgetKit
 
 struct TodoWidgetView: View {
     let entry: TodoEntry
+    private var colors: AppColors { Theme.current }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,7 +27,7 @@ struct TodoWidgetView: View {
                     Spacer()
                     Text("タスクなし")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(colors.textSecondary)
                     Spacer()
                 }
                 Spacer()
@@ -39,7 +40,7 @@ struct TodoWidgetView: View {
                             Text(todo.title)
                                 .font(.system(size: 13))
                                 .strikethrough(todo.completed)
-                                .foregroundStyle(todo.completed ? Color(.systemGray) : Color(.darkGray))
+                                .foregroundStyle(todo.completed ? colors.textSecondary : colors.textPrimary)
                                 .lineLimit(2)
                         }
                     }
@@ -53,15 +54,15 @@ struct TodoWidgetView: View {
     private func widgetCheckbox(_ completed: Bool) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
+                .fill(completed ? colors.checkboxFill : colors.checkboxBackground)
                 .frame(width: 13, height: 13)
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .stroke(completed ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1)
+                .stroke(completed ? Color.clear : colors.checkboxBorder, lineWidth: 1)
                 .frame(width: 13, height: 13)
             if completed {
                 Image(systemName: "checkmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Color(white: 0.3))
+                    .foregroundStyle(colors.checkmarkColor)
             }
         }
     }
@@ -71,15 +72,15 @@ struct TodoWidgetView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Today")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                 Text(dateString)
                     .font(.system(size: 11))
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(colors.textSecondary)
             }
             Spacer()
             Text("\(entry.completedCount)/\(entry.totalCount)")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(.systemGray))
+                .foregroundStyle(colors.textSecondary)
         }
     }
 

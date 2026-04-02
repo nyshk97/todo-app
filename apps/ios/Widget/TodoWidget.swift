@@ -80,7 +80,7 @@ struct TodoWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: TodoProvider()) { entry in
             TodoWidgetView(entry: entry)
-                .containerBackground(Color(red: 1.0, green: 0.97, blue: 0.88), for: .widget)
+                .containerBackground(Theme.current.listBackground, for: .widget)
         }
         .configurationDisplayName("Today's Tasks")
         .description("今日のタスク一覧を表示します")

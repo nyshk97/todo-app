@@ -9,12 +9,14 @@ struct ContentView: View {
     @State private var editingTitle: String = ""
     @Environment(\.scenePhase) private var scenePhase
 
+    private var colors: AppColors { Theme.current }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
             todoListView
         }
-        .background(Color(red: 0.96, green: 0.95, blue: 0.91))
+        .background(colors.panelBackground)
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()
@@ -33,10 +35,10 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Text(viewModel.dateLabel)
                     .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(colors.textSecondary)
             }
             .frame(maxWidth: .infinity)
 
@@ -46,7 +48,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.title2)
-                        .foregroundStyle(Color(.darkGray))
+                        .foregroundStyle(colors.textPrimary)
                 }
                 Spacer()
                 if !viewModel.isToday {
@@ -55,7 +57,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "chevron.right")
                             .font(.title2)
-                            .foregroundStyle(Color(.darkGray))
+                            .foregroundStyle(colors.textPrimary)
                     }
                 }
             }
@@ -99,9 +101,9 @@ struct ContentView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .background(Color(red: 1.0, green: 0.97, blue: 0.88))
+        .background(colors.listBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+        .shadow(color: colors.shadowColor, radius: 12, x: 0, y: 4)
         .padding(.horizontal, 16)
         .overlay {
             if viewModel.isLoading {
@@ -110,10 +112,10 @@ struct ContentView: View {
                 VStack(spacing: 12) {
                     Text("—")
                         .font(.system(size: 40, weight: .ultraLight))
-                        .foregroundStyle(Color(.systemGray3))
+                        .foregroundStyle(colors.textSecondary.opacity(0.5))
                     Text("No tasks")
                         .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(Color(.systemGray2))
+                        .foregroundStyle(colors.textSecondary)
                 }
             }
         }
@@ -125,11 +127,11 @@ struct ContentView: View {
         HStack(spacing: 12) {
             Image(systemName: "plus")
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(.systemGray2))
+                .foregroundStyle(colors.textSecondary)
 
-            TextField("Add a task", text: $viewModel.newTaskTitle, prompt: Text("Add a task").foregroundStyle(Color(.systemGray2)))
+            TextField("Add a task", text: $viewModel.newTaskTitle, prompt: Text("Add a task").foregroundStyle(colors.textSecondary))
                 .font(.system(size: 15))
-                .foregroundStyle(Color(.darkGray))
+                .foregroundStyle(colors.textPrimary)
                 .focused($isInputFocused)
                 .submitLabel(.done)
                 .onSubmit {
@@ -149,15 +151,15 @@ struct ContentView: View {
     private func checkboxIcon(_ completed: Bool) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
+                .fill(completed ? colors.checkboxFill : colors.checkboxBackground)
                 .frame(width: 15, height: 15)
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(completed ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1.2)
+                .stroke(completed ? Color.clear : colors.checkboxBorder, lineWidth: 1.2)
                 .frame(width: 15, height: 15)
             if completed {
                 Image(systemName: "checkmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color(white: 0.3))
+                    .foregroundStyle(colors.checkmarkColor)
             }
         }
     }
@@ -178,7 +180,7 @@ struct ContentView: View {
             if editingTodoId == todo.id {
                 TextField("", text: $editingTitle)
                     .font(.system(size: 15))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                     .submitLabel(.done)
                     .onSubmit {
                         let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -193,12 +195,12 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 13))
-                        .foregroundStyle(Color(.systemGray2))
+                        .foregroundStyle(colors.textSecondary)
                 }
             } else if viewModel.editable && !todo.completed {
                 linkedText(todo.title)
                     .font(.system(size: 15))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -209,7 +211,7 @@ struct ContentView: View {
                 linkedText(todo.title)
                     .font(.system(size: 15))
                     .strikethrough(todo.completed)
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(colors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
