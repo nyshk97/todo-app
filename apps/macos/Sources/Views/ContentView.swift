@@ -7,13 +7,15 @@ struct ContentView: View {
     @State private var editingTitle: String = ""
     @State private var draggingTodoId: String?
 
+    private var colors: AppColors { Theme.current }
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
             todoListView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0.96, green: 0.95, blue: 0.91))
+        .background(colors.panelBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task {
             await viewModel.loadTodos()
@@ -30,10 +32,10 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Text(viewModel.dateLabel)
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
-                    .foregroundStyle(Color(.systemGray))
+                    .foregroundStyle(colors.textSecondary)
             }
             .frame(maxWidth: .infinity)
 
@@ -43,7 +45,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.title3)
-                        .foregroundStyle(Color(.darkGray))
+                        .foregroundStyle(colors.textPrimary)
                 }
                 .buttonStyle(.plain)
                 Spacer()
@@ -53,7 +55,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "chevron.right")
                             .font(.title3)
-                            .foregroundStyle(Color(.darkGray))
+                            .foregroundStyle(colors.textPrimary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -99,9 +101,9 @@ struct ContentView: View {
             }
         }
         .scrollIndicators(.hidden)
-        .background(Color(red: 1.0, green: 0.97, blue: 0.88))
+        .background(colors.listBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 3)
+        .shadow(color: colors.shadowColor, radius: 8, x: 0, y: 3)
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
         .overlay {
@@ -111,10 +113,10 @@ struct ContentView: View {
                 VStack(spacing: 12) {
                     Text("—")
                         .font(.system(size: 32, weight: .ultraLight))
-                        .foregroundStyle(Color(.systemGray))
+                        .foregroundStyle(colors.textSecondary)
                     Text("No tasks")
                         .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(Color(.systemGray))
+                        .foregroundStyle(colors.textSecondary)
                 }
             }
         }
@@ -126,11 +128,11 @@ struct ContentView: View {
         HStack(spacing: 10) {
             Image(systemName: "plus")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color(.systemGray))
+                .foregroundStyle(colors.textSecondary)
 
             TextField("Add a task", text: $viewModel.newTaskTitle)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(.darkGray))
+                .foregroundStyle(colors.textPrimary)
                 .textFieldStyle(.plain)
                 .onSubmit {
                     let title = viewModel.newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -146,15 +148,15 @@ struct ContentView: View {
     private func checkboxIcon(_ completed: Bool) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(completed ? Color(red: 0.93, green: 0.78, blue: 0.30) : .white)
+                .fill(completed ? colors.checkboxFill : colors.checkboxBackground)
                 .frame(width: 14, height: 14)
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .stroke(completed ? Color.clear : Color.gray.opacity(0.25), lineWidth: 1)
+                .stroke(completed ? Color.clear : colors.checkboxBorder, lineWidth: 1)
                 .frame(width: 14, height: 14)
             if completed {
                 Image(systemName: "checkmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Color(white: 0.3))
+                    .foregroundStyle(colors.checkmarkColor)
             }
         }
     }
@@ -175,7 +177,7 @@ struct ContentView: View {
             if editingTodoId == todo.id {
                 TextField("", text: $editingTitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                     .textFieldStyle(.plain)
                     .onSubmit {
                         let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -190,13 +192,13 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "trash")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(.systemGray))
+                        .foregroundStyle(colors.textSecondary)
                 }
                 .buttonStyle(.plain)
             } else if viewModel.editable && !todo.completed {
                 linkedText(todo.title)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(.darkGray))
+                    .foregroundStyle(colors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -207,7 +209,7 @@ struct ContentView: View {
                 linkedText(todo.title)
                     .font(.system(size: 13))
                     .strikethrough(todo.completed)
-                    .foregroundStyle(todo.completed ? Color(.systemGray) : Color(.darkGray))
+                    .foregroundStyle(todo.completed ? colors.textSecondary : colors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
