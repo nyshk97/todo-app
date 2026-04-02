@@ -19,7 +19,7 @@ sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$VERSION\"/" "$REPO_
 cd "$REPO_ROOT"
 if ! git diff --quiet apps/macos/project.yml; then
   git add apps/macos/project.yml
-  git commit -m "chore: macOSアプリのバージョンを$VERSIONに更新"
+  git commit -m "chore: bump macOS app version to $VERSION"
   git push origin main
 fi
 
