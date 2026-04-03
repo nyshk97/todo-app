@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var editingTitle: String = ""
     @State private var swipeOffset: CGFloat = 0
     @State private var swipingTodoId: String?
+    @State private var durationPickerTodoId: String?
     @Environment(\.scenePhase) private var scenePhase
 
     private var colors: AppColors { Theme.current }
@@ -122,6 +123,23 @@ struct ContentView: View {
                 }
             }
         }
+        .confirmationDialog("Duration", isPresented: Binding(
+            get: { durationPickerTodoId != nil },
+            set: { if !$0 { durationPickerTodoId = nil } }
+        )) {
+            Button("~5 min") { setDuration(5) }
+            Button("15 min") { setDuration(15) }
+            Button("30 min") { setDuration(30) }
+            Button("60 min") { setDuration(60) }
+            Button("Clear", role: .destructive) { setDuration(nil) }
+            Button("Cancel", role: .cancel) { durationPickerTodoId = nil }
+        }
+    }
+
+    private func setDuration(_ duration: Int?) {
+        guard let todoId = durationPickerTodoId else { return }
+        durationPickerTodoId = nil
+        Task { await viewModel.updateDuration(id: todoId, duration: duration) }
     }
 
     // MARK: - Inline Add
@@ -151,22 +169,32 @@ struct ContentView: View {
         }
     }
 
-    private func checkboxIcon(_ completed: Bool) -> some View {
+    private func durationLabel(_ duration: Int?) -> String {
+        guard let d = duration else { return "-" }
+        if d <= 5 { return "5" }
+        if d <= 15 { return "15" }
+        if d <= 30 { return "30" }
+        return "60"
+    }
+
+    private func durationBadge(_ todo: Todo) -> some View {
+        let label = durationLabel(todo.duration)
+        let hasValue = todo.duration != nil
+        return Text(label)
+            .font(.system(size: 10, weight: hasValue ? .semibold : .regular, design: .monospaced))
+            .foregroundStyle(hasValue ? colors.textPrimary : colors.textSecondary)
+            .frame(width: 30, alignment: .center)
+    }
+
+    private func checkboxIcon() -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(completed ? colors.checkboxFill : colors.checkboxBackground)
+                .fill(colors.checkboxFill)
                 .frame(width: 15, height: 15)
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(completed ? Color.clear : colors.checkboxBorder, lineWidth: 1.2)
-                .frame(width: 15, height: 15)
-            if completed {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(colors.checkmarkColor)
-                    .transition(.scale.combined(with: .opacity))
-            }
+            Image(systemName: "checkmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(colors.checkmarkColor)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: completed)
     }
 
     // MARK: - Todo Row
@@ -198,18 +226,18 @@ struct ContentView: View {
 
             // メインの行コンテンツ
             HStack(spacing: 12) {
-                Button {
-                    guard viewModel.editable else { return }
-                    editingTodoId = nil
-                    let becoming = !todo.completed
-                    UIImpactFeedbackGenerator(style: becoming ? .medium : .light).impactOccurred()
-                    Task { await viewModel.toggleCompleted(todo) }
-                } label: {
-                    checkboxIcon(todo.completed)
+                if todo.completed {
+                    checkboxIcon()
+                } else {
+                    Button {
+                        guard viewModel.editable else { return }
+                        durationPickerTodoId = todo.id
+                    } label: {
+                        durationBadge(todo)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.editable)
                 }
-                .buttonStyle(.plain)
-                .opacity(!viewModel.editable && !todo.completed ? 0.3 : 1)
-                .disabled(!viewModel.editable)
 
                 if editingTodoId == todo.id {
                     TextField("", text: $editingTitle)

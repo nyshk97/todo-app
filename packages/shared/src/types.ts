@@ -6,6 +6,7 @@ export interface Todo {
   position: number;
   carried_over: boolean;
   completed_at: string | null;
+  duration: number | null; // 所要時間（分）。null = 未設定
   created_at: string;
   updated_at: string;
 }
@@ -18,6 +19,7 @@ export interface UpdateTodoRequest {
   title?: string;
   completed?: boolean;
   position?: number;
+  duration?: number | null;
 }
 
 export interface ReorderRequest {

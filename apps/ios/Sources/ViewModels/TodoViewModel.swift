@@ -47,7 +47,14 @@ final class TodoViewModel {
     }
 
     var uncompletedTodos: [Todo] {
-        todos.filter { !$0.completed }
+        todos.filter { !$0.completed }.sorted { a, b in
+            switch (a.duration, b.duration) {
+            case (.some(let da), .some(let db)): return da < db
+            case (.some, .none): return true
+            case (.none, .some): return false
+            case (.none, .none): return a.position < b.position
+            }
+        }
     }
 
     var completedTodos: [Todo] {
@@ -96,6 +103,19 @@ final class TodoViewModel {
             if let j = todos.firstIndex(where: { $0.id == todo.id }) {
                 todos[j] = original
             }
+            self.error = error.localizedDescription
+        }
+    }
+
+    func updateDuration(id: String, duration: Int?) async {
+        guard editable else { return }
+        do {
+            let updated = try await api.updateTodo(id: id, duration: duration)
+            if let i = todos.firstIndex(where: { $0.id == id }) {
+                todos[i] = updated
+            }
+            reloadWidget()
+        } catch {
             self.error = error.localizedDescription
         }
     }

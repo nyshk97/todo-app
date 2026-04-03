@@ -7,11 +7,12 @@ struct Todo: Codable, Identifiable, Equatable {
     var completed: Bool
     var position: Int
     let carriedOver: Bool
+    var duration: Int?
     let createdAt: String
     let updatedAt: String
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, completed, position
+        case id, title, date, completed, position, duration
         case carriedOver = "carried_over"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
