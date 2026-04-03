@@ -131,6 +131,9 @@ struct ContentView: View {
             Image(systemName: "plus")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(colors.textSecondary)
+                .onTapGesture {
+                    isInputFocused = true
+                }
 
             TextField("Add a task", text: $viewModel.newTaskTitle, prompt: Text("Add a task").foregroundStyle(colors.textSecondary))
                 .font(.system(size: 15))
