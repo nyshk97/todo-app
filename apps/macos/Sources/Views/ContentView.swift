@@ -16,12 +16,21 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(colors.panelBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            editingTodoId = nil
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task {
             await viewModel.loadTodos()
         }
         .onReceive(NotificationCenter.default.publisher(for: .panelDidShow)) { _ in
             Task { await viewModel.loadTodos() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundTapped)) { _ in
+            editingTodoId = nil
+            NSApp.keyWindow?.makeFirstResponder(nil)
         }
     }
 
@@ -265,6 +274,7 @@ struct WindowDragView: NSViewRepresentable {
 
 class WindowDragNSView: NSView {
     override func mouseDown(with event: NSEvent) {
+        NotificationCenter.default.post(name: .backgroundTapped, object: nil)
         window?.performDrag(with: event)
     }
 }

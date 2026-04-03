@@ -20,6 +20,11 @@ struct ContentView: View {
             todoListView
         }
         .background(colors.panelBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isInputFocused = false
+            editingTodoId = nil
+        }
         .gesture(swipeGesture)
         .task {
             await viewModel.loadTodos()

@@ -124,4 +124,5 @@ struct PanelContentView: View {
 
 extension Notification.Name {
     static let panelDidShow = Notification.Name("panelDidShow")
+    static let backgroundTapped = Notification.Name("backgroundTapped")
 }
