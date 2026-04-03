@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
     @State private var draggingTodoId: String?
+    @FocusState private var isInputFocused: Bool
 
     private var colors: AppColors { Theme.current }
 
@@ -18,8 +19,8 @@ struct ContentView: View {
         .background(colors.panelBackground)
         .contentShape(Rectangle())
         .onTapGesture {
+            isInputFocused = false
             editingTodoId = nil
-            NSApp.keyWindow?.makeFirstResponder(nil)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task {
@@ -29,8 +30,8 @@ struct ContentView: View {
             Task { await viewModel.loadTodos() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .backgroundTapped)) { _ in
+            isInputFocused = false
             editingTodoId = nil
-            NSApp.keyWindow?.makeFirstResponder(nil)
         }
     }
 
@@ -138,11 +139,15 @@ struct ContentView: View {
             Image(systemName: "plus")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(colors.textSecondary)
+                .onTapGesture {
+                    isInputFocused = true
+                }
 
             TextField("Add a task", text: $viewModel.newTaskTitle)
                 .font(.system(size: 13))
                 .foregroundStyle(colors.textPrimary)
                 .textFieldStyle(.plain)
+                .focused($isInputFocused)
                 .onSubmit {
                     let title = viewModel.newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !title.isEmpty {
