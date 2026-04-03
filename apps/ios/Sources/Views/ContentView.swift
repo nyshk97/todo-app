@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -160,8 +161,10 @@ struct ContentView: View {
                 Image(systemName: "checkmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(colors.checkmarkColor)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: completed)
     }
 
     // MARK: - Todo Row
@@ -171,6 +174,8 @@ struct ContentView: View {
             Button {
                 guard viewModel.editable else { return }
                 editingTodoId = nil
+                let becoming = !todo.completed
+                UIImpactFeedbackGenerator(style: becoming ? .medium : .light).impactOccurred()
                 Task { await viewModel.toggleCompleted(todo) }
             } label: {
                 checkboxIcon(todo.completed)

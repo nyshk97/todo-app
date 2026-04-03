@@ -83,13 +83,19 @@ final class TodoViewModel {
 
     func toggleCompleted(_ todo: Todo) async {
         guard editable else { return }
+        guard let i = todos.firstIndex(where: { $0.id == todo.id }) else { return }
+        let original = todos[i]
+        todos[i].completed = !todo.completed
         do {
             let updated = try await api.updateTodo(id: todo.id, completed: !todo.completed)
-            if let i = todos.firstIndex(where: { $0.id == todo.id }) {
-                todos[i] = updated
+            if let j = todos.firstIndex(where: { $0.id == todo.id }) {
+                todos[j] = updated
             }
             reloadWidget()
         } catch {
+            if let j = todos.firstIndex(where: { $0.id == todo.id }) {
+                todos[j] = original
+            }
             self.error = error.localizedDescription
         }
     }

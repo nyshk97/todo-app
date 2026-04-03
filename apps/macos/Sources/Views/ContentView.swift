@@ -157,8 +157,10 @@ struct ContentView: View {
                 Image(systemName: "checkmark")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(colors.checkmarkColor)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: completed)
     }
 
     // MARK: - Todo Row
