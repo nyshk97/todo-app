@@ -175,6 +175,8 @@ struct ContentView: View {
                 checkboxIcon(todo.completed)
             }
             .buttonStyle(.plain)
+            .opacity(!viewModel.editable && !todo.completed ? 0.3 : 1)
+            .disabled(!viewModel.editable)
 
             if editingTodoId == todo.id {
                 TextField("", text: $editingTitle)
