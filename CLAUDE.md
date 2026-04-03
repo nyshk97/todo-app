@@ -44,7 +44,7 @@
 - `bash scripts/generate-projects.sh` - iOS/macOS の Xcode プロジェクト生成（`.env` の Team ID をプレースホルダーに置換、`Secrets.swift` を自動生成）
 - `apps/{ios,macos}/.env` に `DEVELOPMENT_TEAM=<Team ID>` と `API_SECRET=<token>` を設定。`Secrets.swift` は gitignore 対象
 - `bash scripts/build.sh` - macOS アプリを Release ビルドして zip 化
-- `bash scripts/release.sh <version>` - `MARKETING_VERSION` 自動更新 → Release ビルド → GitHub Release 作成。その後 `nyshk97/homebrew-tap` の `Casks/todo-mac.rb` を version と sha256 で更新する
+- `bash scripts/release.sh <version>` - `MARKETING_VERSION` 自動更新 → Release ビルド → GitHub Release 作成 → homebrew-tap の Cask 更新 → ローカル tap 同期まで自動実行
 
 ## Brewfile
 

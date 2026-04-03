@@ -35,9 +35,37 @@ gh release create "v$VERSION" "$ZIP_FILE" \
 
 SHA256=$(shasum -a 256 "$ZIP_FILE" | awk '{print $1}')
 
+# homebrew-tap の Cask を更新
+CASK_CONTENT=$(cat <<CASK
+cask "todo-mac" do
+  version "$VERSION"
+  sha256 "$SHA256"
+
+  url "https://github.com/nyshk97/todo-app/releases/download/v#{version}/TodoMac.zip"
+  name "TodoMac"
+  homepage "https://github.com/nyshk97/todo-app"
+
+  app "TodoMac.app"
+end
+CASK
+)
+
+ENCODED=$(echo "$CASK_CONTENT" | base64)
+FILE_SHA=$(gh api repos/nyshk97/homebrew-tap/contents/Casks/todo-mac.rb --jq '.sha')
+
+gh api repos/nyshk97/homebrew-tap/contents/Casks/todo-mac.rb \
+  --method PUT \
+  --field message="chore: bump todo-mac to $VERSION" \
+  --field content="$ENCODED" \
+  --field sha="$FILE_SHA" \
+  --silent
+
+# ローカルの tap を同期
+TAP_DIR="$(brew --repository nyshk97/homebrew-tap 2>/dev/null || true)"
+if [ -d "$TAP_DIR/.git" ]; then
+  git -C "$TAP_DIR" pull --ff-only origin main --quiet
+fi
+
 echo ""
 echo "✅ Released v$VERSION"
-echo ""
-echo "Update homebrew-tap Casks/todo-mac.rb:"
-echo "  version \"$VERSION\""
-echo "  sha256 \"$SHA256\""
+echo "✅ homebrew-tap updated & synced"
