@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var draggingTodoId: String?
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
+    @State private var swipeOffset: CGFloat = 0
+    @State private var swipingTodoId: String?
     @Environment(\.scenePhase) private var scenePhase
 
     private var colors: AppColors { Theme.current }
@@ -169,62 +171,115 @@ struct ContentView: View {
 
     // MARK: - Todo Row
 
-    private func todoRow(_ todo: Todo) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                guard viewModel.editable else { return }
-                editingTodoId = nil
-                let becoming = !todo.completed
-                UIImpactFeedbackGenerator(style: becoming ? .medium : .light).impactOccurred()
-                Task { await viewModel.toggleCompleted(todo) }
-            } label: {
-                checkboxIcon(todo.completed)
-            }
-            .buttonStyle(.plain)
-            .opacity(!viewModel.editable && !todo.completed ? 0.3 : 1)
-            .disabled(!viewModel.editable)
+    private let swipeThreshold: CGFloat = 80
 
-            if editingTodoId == todo.id {
-                TextField("", text: $editingTitle)
-                    .font(.system(size: 15))
-                    .foregroundStyle(colors.textPrimary)
-                    .submitLabel(.done)
-                    .onSubmit {
-                        let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !title.isEmpty && title != todo.title {
-                            Task { await viewModel.updateTitle(id: todo.id, title: title) }
-                        }
-                        editingTodoId = nil
+    private func todoRow(_ todo: Todo) -> some View {
+        let canSwipeComplete = viewModel.editable && !todo.completed && editingTodoId != todo.id
+        let offset = swipingTodoId == todo.id ? swipeOffset : 0
+
+        return ZStack(alignment: .leading) {
+            // スワイプ時の背景（チェックマーク）
+            if offset > 0 && canSwipeComplete {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                    if offset > swipeThreshold {
+                        Text("Done")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
                     }
-                Button {
-                    Task { await viewModel.deleteTodo(todo) }
-                    editingTodoId = nil
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 13))
-                        .foregroundStyle(colors.textSecondary)
+                    Spacer()
                 }
-            } else if viewModel.editable && !todo.completed {
-                linkedText(todo.title)
-                    .font(.system(size: 15))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        editingTodoId = todo.id
-                        editingTitle = todo.title
-                    }
-            } else {
-                linkedText(todo.title)
-                    .font(.system(size: 15))
-                    .strikethrough(todo.completed)
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.green.opacity(min(1, offset / swipeThreshold)))
             }
+
+            // メインの行コンテンツ
+            HStack(spacing: 12) {
+                Button {
+                    guard viewModel.editable else { return }
+                    editingTodoId = nil
+                    let becoming = !todo.completed
+                    UIImpactFeedbackGenerator(style: becoming ? .medium : .light).impactOccurred()
+                    Task { await viewModel.toggleCompleted(todo) }
+                } label: {
+                    checkboxIcon(todo.completed)
+                }
+                .buttonStyle(.plain)
+                .opacity(!viewModel.editable && !todo.completed ? 0.3 : 1)
+                .disabled(!viewModel.editable)
+
+                if editingTodoId == todo.id {
+                    TextField("", text: $editingTitle)
+                        .font(.system(size: 15))
+                        .foregroundStyle(colors.textPrimary)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !title.isEmpty && title != todo.title {
+                                Task { await viewModel.updateTitle(id: todo.id, title: title) }
+                            }
+                            editingTodoId = nil
+                        }
+                    Button {
+                        Task { await viewModel.deleteTodo(todo) }
+                        editingTodoId = nil
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 13))
+                            .foregroundStyle(colors.textSecondary)
+                    }
+                } else if viewModel.editable && !todo.completed {
+                    linkedText(todo.title)
+                        .font(.system(size: 15))
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            editingTodoId = todo.id
+                            editingTitle = todo.title
+                        }
+                } else {
+                    linkedText(todo.title)
+                        .font(.system(size: 15))
+                        .strikethrough(todo.completed)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .offset(x: offset)
+            .background(colors.listBackground)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
         .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { value in
+                    guard canSwipeComplete else { return }
+                    let horizontal = value.translation.width
+                    let vertical = value.translation.height
+                    // 縦方向の動きが大きければスクロールに任せる
+                    guard abs(horizontal) > abs(vertical) else { return }
+                    if horizontal > 0 {
+                        swipingTodoId = todo.id
+                        swipeOffset = horizontal
+                    }
+                }
+                .onEnded { value in
+                    guard canSwipeComplete else { return }
+                    if swipeOffset > swipeThreshold {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task { await viewModel.toggleCompleted(todo) }
+                    }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        swipeOffset = 0
+                        swipingTodoId = nil
+                    }
+                }
+        )
     }
 
     // MARK: - Swipe Gesture
