@@ -44,13 +44,10 @@ actor APIClient {
         return try decoder.decode(Todo.self, from: data)
     }
 
-    func updateTodo(id: String, completed: Bool? = nil, title: String? = nil, duration: Int?? = nil) async throws -> Todo {
+    func updateTodo(id: String, completed: Bool? = nil, title: String? = nil) async throws -> Todo {
         var body: [String: AnyCodable] = [:]
         if let completed { body["completed"] = AnyCodable(completed) }
         if let title { body["title"] = AnyCodable(title) }
-        if let duration {
-            body["duration"] = duration.map { AnyCodable($0) } ?? AnyCodable(NSNull())
-        }
         let data = try await request("/todos/\(id)", method: "PATCH", body: body)
         return try decoder.decode(Todo.self, from: data)
     }
@@ -85,8 +82,7 @@ struct AnyCodable: Codable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        if value is NSNull { try container.encodeNil() }
-        else if let v = value as? Bool { try container.encode(v) }
+        if let v = value as? Bool { try container.encode(v) }
         else if let v = value as? String { try container.encode(v) }
         else if let v = value as? Int { try container.encode(v) }
         else if let v = value as? Double { try container.encode(v) }

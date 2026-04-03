@@ -100,19 +100,6 @@ final class TodoViewModel {
         }
     }
 
-    func updateDuration(id: String, duration: Int?) async {
-        guard editable else { return }
-        do {
-            let updated = try await api.updateTodo(id: id, duration: duration)
-            if let i = todos.firstIndex(where: { $0.id == id }) {
-                todos[i] = updated
-            }
-            reloadWidget()
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
     func updateTitle(id: String, title: String) async {
         guard editable else { return }
         do {

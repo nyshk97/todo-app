@@ -22,19 +22,19 @@ async function carryOverIfNeeded(db: D1Database, todayStr: string) {
   const yesterdayStr = yesterday();
   const uncompleted = await db
     .prepare(
-      "SELECT title, position, duration FROM todos WHERE date = ? AND completed = 0 ORDER BY position"
+      "SELECT title, position FROM todos WHERE date = ? AND completed = 0 ORDER BY position"
     )
     .bind(yesterdayStr)
-    .all<{ title: string; position: number; duration: number | null }>();
+    .all<{ title: string; position: number }>();
 
   if (!uncompleted.results || uncompleted.results.length === 0) return;
 
   // 今日のタスクとしてコピー
   const stmt = db.prepare(
-    "INSERT INTO todos (id, title, date, completed, position, carried_over, duration) VALUES (?, ?, ?, 0, ?, 1, ?)"
+    "INSERT INTO todos (id, title, date, completed, position, carried_over) VALUES (?, ?, ?, 0, ?, 1)"
   );
   const batch = uncompleted.results.map((task, i) =>
-    stmt.bind(crypto.randomUUID(), task.title, todayStr, i, task.duration)
+    stmt.bind(crypto.randomUUID(), task.title, todayStr, i)
   );
   await db.batch(batch);
 }
@@ -63,7 +63,6 @@ todos.get("/", async (c) => {
       position: row.position,
       carried_over: row.carried_over === 1,
       completed_at: row.completed_at ?? null,
-      duration: row.duration ?? null,
       created_at: row.created_at,
       updated_at: row.updated_at,
     })),
@@ -107,7 +106,6 @@ todos.post("/", async (c) => {
       completed: (todo as Record<string, unknown>).completed === 1,
       carried_over: (todo as Record<string, unknown>).carried_over === 1,
       completed_at: (todo as Record<string, unknown>).completed_at ?? null,
-      duration: (todo as Record<string, unknown>).duration ?? null,
     },
     201
   );
@@ -130,7 +128,6 @@ todos.patch("/:id", async (c) => {
     title?: string;
     completed?: boolean;
     position?: number;
-    duration?: number | null;
   }>();
 
   const updates: string[] = [];
@@ -153,14 +150,6 @@ todos.patch("/:id", async (c) => {
   if (body.position !== undefined) {
     updates.push("position = ?");
     values.push(body.position);
-  }
-  if (body.duration !== undefined) {
-    if (body.duration === null) {
-      updates.push("duration = NULL");
-    } else {
-      updates.push("duration = ?");
-      values.push(body.duration);
-    }
   }
 
   if (updates.length === 0) {
@@ -185,7 +174,6 @@ todos.patch("/:id", async (c) => {
     completed: (updated as Record<string, unknown>).completed === 1,
     carried_over: (updated as Record<string, unknown>).carried_over === 1,
     completed_at: (updated as Record<string, unknown>).completed_at ?? null,
-    duration: (updated as Record<string, unknown>).duration ?? null,
   });
 });
 
