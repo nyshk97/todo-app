@@ -21,7 +21,7 @@
 
 - XcodeGen で `project.yml` からプロジェクト生成。`.xcodeproj` は gitignore 対象
 - `apps/ios/.env` に `DEVELOPMENT_TEAM=<Team ID>` を設定（git 管理外）
-- Personal Team 署名のため実機インストールは 7 日で期限切れ
+- Apple Developer Program（個人）で署名。Xcode の自動署名を使用
 - ウィジェットのバンドル ID: `com.d0ne1s.todoapp.widget`
 - WidgetKit 更新: ViewModel 内で `WidgetCenter.shared.reloadAllTimelines()` を呼ぶ
 - `LazyVStack` で同じ ID を複数の `ForEach` で使うとキャッシュバグが起きる。完了済みタスクには `.id("done-\(todo.id)")` で回避

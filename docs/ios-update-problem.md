@@ -3,12 +3,14 @@
 ## 前提
 
 - 個人利用のアプリ。App Store に公開する予定はない
-- 現在は Xcode から USB 接続で iPhone に直接インストールしている（Personal Team 署名）
+- Apple Developer Program（個人）に登録済み（2026-04-03 承認。Team ID: `VYDUR99LAM`）
+- 以前は Personal Team 署名で 7 日ごとに再ビルドが必要だったが、解消済み
 
-## 現状の問題
+## 以前の問題（解決済み）
 
-- Personal Team 署名は **7 日間** で期限切れ → 毎週ビルドし直す必要がある
-- Mac と iPhone を USB で繋いで Xcode からビルドする手間が毎回発生する
+- ~~Personal Team 署名は **7 日間** で期限切れ → 毎週ビルドし直す必要がある~~
+- ~~Mac と iPhone を USB で繋いで Xcode からビルドする手間が毎回発生する~~
+- Apple Developer Program に登録したことで 7 日制限は解消
 
 ## 配布方法の選択肢
 
@@ -126,46 +128,18 @@
 
 ## 方針
 
-**Ad Hoc 配布に移行する。**
+**Xcode 直接インストール（開発署名）を継続する。**
 
-## やること
+- Apple Developer Program に登録したことで、開発用プロビジョニングプロファイルの有効期間が約1年になり、7日制限は解消
+- 個人利用（1人・1台）なので Ad Hoc や TestFlight に移行するメリットが薄い
+- USB 不要の配布や CI/CD 自動化が必要になった場合は Ad Hoc を検討する
 
-### 1. Apple Developer Program に登録する（手動） ✅ 承認待ち
+## 完了したこと
 
-- ~~developer.apple.com/programs/enroll にアクセス~~
-- ~~Apple ID でサインイン（2 ファクタ認証を有効にしておく）~~
-- ~~本人確認を完了して $99 を支払う~~
-- 承認を待つ（最長 48 時間。2026-04-02 に申請済み）
-- 承認されると Account ページに「Certificates, IDs, & Profiles」が出現する
+- ✅ Apple Developer Program に登録（2026-04-02 申請 → 2026-04-03 承認）
+- ✅ Team ID を `VYDUR99LAM` に更新（`.env` と Xcode の自動署名で確認済み）
 
-### 2. Apple Developer Portal でセットアップする（手動）
+## 年次更新
 
-- **App ID を 2 つ登録する**
-  - `com.d0ne1s.todoapp`（メインアプリ）
-  - `com.d0ne1s.todoapp.widget`（ウィジェット）
-- **iPhone の UDID を登録する**
-- **Ad Hoc 用 Distribution Certificate を作成する**
-- **Ad Hoc 用 Provisioning Profile を 2 つ作成する**
-  - メインアプリ用（`com.d0ne1s.todoapp`）
-  - ウィジェット用（`com.d0ne1s.todoapp.widget`）
-
-### 3. Xcode のビルド設定を Ad Hoc 署名に変更する
-
-- project.yml の署名設定を更新（Team ID、Provisioning Profile 指定など）
-- generate-projects.sh を必要に応じて更新
-
-### 4. Ad Hoc ビルド & インストールする
-
-- Xcode で Archive → Ad Hoc エクスポートで .ipa を生成
-- iPhone にインストール（USB or OTA）
-- ウィジェットが正常に動作するか確認
-
-### 5. （任意）OTA インストール環境を整える
-
-- Diawi 等のサービスを使えば USB 不要でインストールできる
-- 必要になったタイミングで検討すれば OK
-
-### 6. 年次更新のリマインダーを設定する
-
-- Provisioning Profile の期限（1 年後）にリマインダーを設定
-- 期限前にプロファイル再生成 → 再ビルド → 再インストール
+- Apple Developer Program の更新日: 2027-04-03
+- 開発用 Provisioning Profile も年1回 Xcode から再ビルドすれば自動更新される
