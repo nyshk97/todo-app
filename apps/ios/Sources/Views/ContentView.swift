@@ -30,6 +30,36 @@ struct ContentView: View {
                 Task { await viewModel.loadTodos() }
             }
         }
+        .overlay {
+            if durationPickerTodoId != nil {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture { durationPickerTodoId = nil }
+
+                VStack(spacing: 0) {
+                    ForEach([5, 15, 30, 60], id: \.self) { minutes in
+                        Button {
+                            setDuration(minutes)
+                        } label: {
+                            Text(minutes == 5 ? "~\(minutes) min" : "\(minutes) min")
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        if minutes != 60 {
+                            Divider().overlay(colors.checkboxBorder)
+                        }
+                    }
+                }
+                .background(colors.listBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: colors.shadowColor, radius: 20, x: 0, y: 8)
+                .padding(.horizontal, 60)
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: durationPickerTodoId)
+            }
+        }
     }
 
     // MARK: - Header
@@ -123,17 +153,6 @@ struct ContentView: View {
                 }
             }
         }
-        .confirmationDialog("Duration", isPresented: Binding(
-            get: { durationPickerTodoId != nil },
-            set: { if !$0 { durationPickerTodoId = nil } }
-        )) {
-            Button("~5 min") { setDuration(5) }
-            Button("15 min") { setDuration(15) }
-            Button("30 min") { setDuration(30) }
-            Button("60 min") { setDuration(60) }
-            Button("Clear", role: .destructive) { setDuration(nil) }
-            Button("Cancel", role: .cancel) { durationPickerTodoId = nil }
-        }
     }
 
     private func setDuration(_ duration: Int?) {
@@ -177,13 +196,28 @@ struct ContentView: View {
         return "60"
     }
 
+    private func durationBadgeColor(_ duration: Int?) -> Color {
+        guard let d = duration else { return colors.checkboxBackground }
+        if d <= 5 { return Color(red: 0.96, green: 0.91, blue: 0.76) }
+        if d <= 15 { return Color(red: 0.93, green: 0.82, blue: 0.45) }
+        if d <= 30 { return Color(red: 0.90, green: 0.68, blue: 0.30) }
+        return Color(red: 0.85, green: 0.52, blue: 0.25)
+    }
+
     private func durationBadge(_ todo: Todo) -> some View {
         let label = durationLabel(todo.duration)
         let hasValue = todo.duration != nil
-        return Text(label)
-            .font(.system(size: 10, weight: hasValue ? .semibold : .regular, design: .monospaced))
-            .foregroundStyle(hasValue ? colors.textPrimary : colors.textSecondary)
-            .frame(width: 30, alignment: .center)
+        return ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(durationBadgeColor(todo.duration))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(hasValue ? Color.clear : colors.checkboxBorder, lineWidth: 1.2)
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(hasValue ? colors.checkmarkColor : colors.textSecondary)
+        }
+        .frame(width: 28, height: 20)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: todo.duration)
     }
 
     private func checkboxIcon() -> some View {

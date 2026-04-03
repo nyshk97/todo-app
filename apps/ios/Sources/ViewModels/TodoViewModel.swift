@@ -47,14 +47,7 @@ final class TodoViewModel {
     }
 
     var uncompletedTodos: [Todo] {
-        todos.filter { !$0.completed }.sorted { a, b in
-            switch (a.duration, b.duration) {
-            case (.some(let da), .some(let db)): return da < db
-            case (.some, .none): return true
-            case (.none, .some): return false
-            case (.none, .none): return a.position < b.position
-            }
-        }
+        todos.filter { !$0.completed }
     }
 
     var completedTodos: [Todo] {
