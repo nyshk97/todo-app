@@ -26,6 +26,9 @@ struct ContentView: View {
         .task {
             await viewModel.loadTodos()
         }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            Task { await viewModel.loadTodos() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .panelDidShow)) { _ in
             Task { await viewModel.loadTodos() }
         }
