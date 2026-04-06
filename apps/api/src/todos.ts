@@ -50,7 +50,7 @@ todos.get("/", async (c) => {
   }
 
   const result = await c.env.DB
-    .prepare("SELECT * FROM todos WHERE date = ? ORDER BY completed ASC, position ASC")
+    .prepare("SELECT * FROM todos WHERE date = ? ORDER BY completed ASC, completed_at DESC, position ASC")
     .bind(date)
     .all();
 
