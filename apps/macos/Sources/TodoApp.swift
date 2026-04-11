@@ -85,13 +85,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPanel()
+        return false
+    }
+
+    private func showPanel() {
+        panel.orderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .panelDidShow, object: nil)
+    }
+
     private func togglePanel() {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
-            panel.orderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            NotificationCenter.default.post(name: .panelDidShow, object: nil)
+            showPanel()
         }
     }
 }
