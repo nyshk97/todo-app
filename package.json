@@ -1,0 +1,8 @@
+{
+  "name": "todo-shelf",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

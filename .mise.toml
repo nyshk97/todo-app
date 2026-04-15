@@ -1,0 +1,19 @@
+[tasks.dev]
+description = "API ローカル開発サーバー起動"
+run = "cd apps/api && npm run dev"
+
+[tasks.test]
+description = "API テスト実行"
+run = "cd apps/api && npm test"
+
+[tasks.deploy]
+description = "API を本番にデプロイ"
+run = "cd apps/api && npx wrangler deploy"
+
+[tasks."deploy:migrate"]
+description = "本番 DB にマイグレーション適用"
+run = "cd apps/api && npx wrangler d1 migrations apply todo-shelf-db --remote"
+
+[tasks."dev:web"]
+description = "Web ローカル開発サーバー起動"
+run = "cd apps/web && npm run dev"
