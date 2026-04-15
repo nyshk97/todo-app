@@ -23,5 +23,5 @@ export function getDueDateStatus(dueDate: string | null): DueDateStatus {
 
 export function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }

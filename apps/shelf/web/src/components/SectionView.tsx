@@ -43,6 +43,8 @@ function SectionHeader({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(section.name);
+  const [showMenu, setShowMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleSubmit = () => {
     const trimmed = name.trim();
@@ -57,7 +59,10 @@ function SectionHeader({
       display: "flex",
       alignItems: "center",
       gap: 6,
-      padding: "4px 12px",
+      padding: "8px 12px 6px",
+      marginTop: 8,
+      borderBottom: "1px solid var(--border-subtle)",
+      position: "relative",
     }}>
       {dragHandleProps && (
         <span
@@ -87,12 +92,11 @@ function SectionHeader({
             background: "rgba(255,255,255,0.02)",
             border: "1px solid var(--border-standard)",
             borderRadius: "var(--radius-sm)",
-            color: "var(--text-tertiary)",
+            color: "var(--text-primary)",
             fontSize: 13,
-            fontWeight: 510,
+            fontWeight: 600,
             padding: "2px 6px",
             outline: "none",
-            textTransform: "uppercase",
           }}
         />
       ) : (
@@ -100,33 +104,134 @@ function SectionHeader({
           onDoubleClick={() => setEditing(true)}
           style={{
             fontSize: 13,
-            fontWeight: 510,
-            color: "var(--text-tertiary)",
+            fontWeight: 600,
+            color: "var(--text-primary)",
             letterSpacing: "-0.13px",
-            textTransform: "uppercase",
             cursor: "default",
+            margin: 0,
           }}
         >
           {section.name}
         </h3>
       )}
-      {onDelete && (
+      {(onDelete || onRename) && (
         <button
-          onClick={() => onDelete(section.id)}
+          onClick={() => { setShowMenu(!showMenu); setConfirmDelete(false); }}
           style={{
             marginLeft: "auto",
             background: "transparent",
             border: "none",
             color: "var(--text-quaternary)",
-            fontSize: 12,
-            opacity: 0,
-            transition: "opacity 0.1s",
+            fontSize: 14,
+            padding: "2px 6px",
+            cursor: "pointer",
+            lineHeight: 1,
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
         >
-          ×
+          ⋯
         </button>
+      )}
+
+      {showMenu && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 49 }}
+            onClick={() => { setShowMenu(false); setConfirmDelete(false); }}
+          />
+          <div style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 4,
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border-standard)",
+            borderRadius: "var(--radius-md)",
+            padding: 4,
+            minWidth: 140,
+            zIndex: 50,
+          }}>
+            {onRename && (
+              <button
+                onClick={() => { setEditing(true); setShowMenu(false); }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "6px 10px",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                名前を変更
+              </button>
+            )}
+            {onDelete && !confirmDelete && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "6px 10px",
+                  border: "none",
+                  borderRadius: "var(--radius-sm)",
+                  background: "transparent",
+                  color: "var(--color-red)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                削除
+              </button>
+            )}
+            {onDelete && confirmDelete && (
+              <div style={{ padding: "4px 10px" }}>
+                <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "0 0 6px" }}>
+                  タスクはセクション未所属になります
+                </p>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={() => { onDelete(section.id); setShowMenu(false); }}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "none",
+                      background: "var(--color-red)",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 510,
+                      cursor: "pointer",
+                    }}
+                  >
+                    削除する
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--border-standard)",
+                      background: "transparent",
+                      color: "var(--text-tertiary)",
+                      fontSize: 11,
+                      cursor: "pointer",
+                    }}
+                  >
+                    戻す
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

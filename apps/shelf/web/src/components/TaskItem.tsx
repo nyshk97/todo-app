@@ -72,6 +72,21 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
         {task.title}
       </span>
 
+      {task.comment_count > 0 && (
+        <span style={{
+          fontSize: 11,
+          color: "var(--text-quaternary)",
+          display: "flex",
+          alignItems: "center",
+          gap: 3,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2.5 2A1.5 1.5 0 001 3.5v7A1.5 1.5 0 002.5 12H5l3 3 3-3h2.5a1.5 1.5 0 001.5-1.5v-7A1.5 1.5 0 0013.5 2h-11zM2.5 3h11a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H10.7L8 13.2 5.3 11H2.5a.5.5 0 01-.5-.5v-7a.5.5 0 01.5-.5z"/>
+          </svg>
+          {task.comment_count}
+        </span>
+      )}
+
       {task.due_date && status && (
         <span style={{
           fontSize: 11,

@@ -46,6 +46,7 @@ export interface Task {
   title: string;
   due_date: string | null; // YYYY-MM-DD
   position: number;
+  comment_count: number;
   created_at: string;
   updated_at: string;
 }

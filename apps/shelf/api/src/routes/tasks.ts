@@ -45,7 +45,11 @@ app.patch("/tasks/reorder", async (c) => {
 app.get("/projects/:id/tasks", async (c) => {
   const projectId = c.req.param("id");
   const results = await c.env.DB.prepare(
-    "SELECT * FROM tasks WHERE project_id = ? ORDER BY position"
+    `SELECT t.*, COALESCE(cc.cnt, 0) as comment_count
+     FROM tasks t
+     LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM comments GROUP BY task_id) cc ON cc.task_id = t.id
+     WHERE t.project_id = ?
+     ORDER BY t.position`
   )
     .bind(projectId)
     .all();

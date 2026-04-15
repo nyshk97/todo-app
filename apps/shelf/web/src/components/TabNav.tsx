@@ -49,8 +49,9 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
     <nav style={{
       display: "flex",
       alignItems: "center",
-      gap: 4,
-      padding: "8px 16px",
+      justifyContent: "center",
+      gap: 2,
+      padding: "12px 16px",
       borderBottom: "1px solid var(--border-subtle)",
       background: "var(--bg-panel)",
       position: "relative",
@@ -61,14 +62,15 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
           onClick={() => onSelect(p.id)}
           onDoubleClick={() => { setEditingId(p.id); setEditingName(p.name); }}
           style={{
-            padding: "6px 14px",
+            padding: "8px 20px",
             borderRadius: "var(--radius-md)",
             border: "none",
-            background: activeId === p.id ? "rgba(255,255,255,0.08)" : "transparent",
+            background: activeId === p.id ? "rgba(255,255,255,0.1)" : "transparent",
             color: activeId === p.id ? "var(--text-primary)" : "var(--text-tertiary)",
-            fontSize: 13,
-            fontWeight: 510,
+            fontSize: 14,
+            fontWeight: activeId === p.id ? 600 : 510,
             transition: "all 0.15s",
+            cursor: "pointer",
           }}
         >
           {p.name}
@@ -85,6 +87,7 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
           color: "var(--text-quaternary)",
           fontSize: 14,
           transition: "color 0.1s",
+          cursor: "pointer",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-quaternary)")}
@@ -94,7 +97,8 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
 
       {upcomingCount > 0 && (
         <span style={{
-          marginLeft: "auto",
+          position: "absolute",
+          right: 16,
           padding: "2px 8px",
           borderRadius: 9999,
           background: "var(--color-orange)",
