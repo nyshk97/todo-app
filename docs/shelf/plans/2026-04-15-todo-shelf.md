@@ -119,8 +119,8 @@ API → Web → iOS（iOS は後日別計画）
 - [x] プロジェクト管理 UI（追加・リネーム・削除）
 
 ### Phase 6後の準備 [人間👨‍💻]
-- [ ] Web をデプロイ: Cloudflare Pages に接続
-- [ ] 環境変数設定（API URL, API_SECRET）
+- [x] Web をデプロイ: Cloudflare Pages に接続
+- [x] 環境変数設定（API URL, API_SECRET）
 
 ### Phase 7: Todoist データ移行 [AI🤖]
 - [ ] Todoist API からデータエクスポートスクリプト作成（プロジェクト・セクション・タスク・コメント）
