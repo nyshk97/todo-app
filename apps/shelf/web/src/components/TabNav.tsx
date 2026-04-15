@@ -209,7 +209,7 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
             <input
               value={addingName}
               onChange={(e) => setAddingName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAdd(); }}
               placeholder="新規プロジェクト..."
               style={{
                 flex: 1,

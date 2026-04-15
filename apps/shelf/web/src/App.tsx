@@ -70,6 +70,26 @@ function Shell() {
   };
 
   const handleMoveToToday = async (id: string) => {
+    const task = selectedTask;
+    if (!task) return;
+
+    // 1. todo-appにタスク作成（クライアントから直接）
+    const todoAppUrl = import.meta.env.VITE_TODO_APP_API_URL ?? "http://localhost:8788";
+    const todoAppSecret = import.meta.env.VITE_API_SECRET ?? "";
+    const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const res = await fetch(`${todoAppUrl}/todos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${todoAppSecret}`,
+      },
+      body: JSON.stringify({ title: task.title, date: today }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to create todo in todo-app");
+    }
+
+    // 2. Shelf側でアーカイブ
     await api.post(`/tasks/${id}/move-to-today`, {});
     setSelectedTask(null);
     setRefreshKey((k) => k + 1);

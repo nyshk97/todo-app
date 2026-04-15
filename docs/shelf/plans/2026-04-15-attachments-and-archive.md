@@ -147,6 +147,7 @@
 
 ## ログ
 ### 試したこと・わかったこと
+- Cloudflare R2 料金（2026-04-15時点）: 基本料 $0/月。無料枠: ストレージ10GB/月、Class A ops 100万/月、Class B ops 1000万/月。超過分: ストレージ $0.015/GB-月、Class A $4.50/100万、Class B $0.36/100万。エグレス無料
 - `attachmentURL` メソッドを `nonisolated` にする必要あり（actor APIClient から同期的に呼び出すため）
 - 認証ミドルウェアに `?token=` クエリパラメータ対応を追加（`<img src>` や `<a href>` での直接アクセス用）
 - iOS版の `moveTaskToToday` はiOS→todo-app API直接POST + iOS→Shelf API move-to-today の2段構成（Workers間fetch制約の回避策を踏襲）

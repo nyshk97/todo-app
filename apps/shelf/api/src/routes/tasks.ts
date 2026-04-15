@@ -210,26 +210,10 @@ app.post("/tasks/:id/move-to-today", async (c) => {
   const id = c.req.param("id");
   const task = await c.env.DB.prepare("SELECT * FROM tasks WHERE id = ?")
     .bind(id)
-    .first<{ title: string }>();
+    .first();
   if (!task) return c.json({ error: "Not found" }, 404);
 
-  const res = await fetch(
-    `${c.env.TODO_APP_API_URL}/todos`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${c.env.TODO_APP_API_SECRET}`,
-      },
-      body: JSON.stringify({ title: task.title, date: todayJST() }),
-    }
-  );
-
-  if (!res.ok) {
-    return c.json({ error: "Failed to create todo in todo-app" }, 502);
-  }
-
-  // Archive instead of delete
+  // Shelf側でアーカイブのみ（todo-appへのPOSTはクライアント側で実行）
   const now = nowJST();
   await c.env.DB.prepare(
     "UPDATE tasks SET archived_at = ?, updated_at = ? WHERE id = ?"
