@@ -87,6 +87,7 @@ function Shell() {
         activeId={projectId ?? null}
         upcomingCount={upcomingCount}
         onSelect={handleSelect}
+        onProjectsChange={setProjects}
       />
       <main style={{
         flex: 1,

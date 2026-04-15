@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "@todo-shelf/shared";
 import { getDueDateStatus, formatDate } from "../lib/date";
 
@@ -18,10 +20,26 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const status = getDueDateStatus(task.due_date);
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
     <div
-      onClick={() => onClick(task)}
+      ref={setNodeRef}
       style={{
+        ...style,
         display: "flex",
         alignItems: "center",
         gap: 8,
@@ -30,9 +48,26 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
         cursor: "pointer",
         transition: "background 0.1s",
       }}
+      onClick={() => onClick(task)}
       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
+      <span
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          cursor: "grab",
+          color: "var(--text-quaternary)",
+          fontSize: 10,
+          padding: "2px 2px",
+          userSelect: "none",
+          touchAction: "none",
+        }}
+      >
+        ⠿
+      </span>
+
       <span style={{ flex: 1, fontSize: 14, color: "var(--text-secondary)" }}>
         {task.title}
       </span>
@@ -98,7 +133,6 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
             transition: "opacity 0.1s",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          className="delete-btn"
         >
           ×
         </button>
