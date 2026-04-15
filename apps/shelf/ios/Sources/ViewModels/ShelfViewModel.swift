@@ -212,7 +212,7 @@ final class ShelfViewModel {
 
     func moveTaskToToday(_ task: Task) async {
         do {
-            try await api.moveTaskToToday(id: task.id)
+            try await api.moveTaskToToday(id: task.id, title: task.title)
             tasks[task.projectId]?.removeAll { $0.id == task.id }
         } catch {
             errorMessage = error.localizedDescription

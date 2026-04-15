@@ -126,8 +126,30 @@ actor APIClient {
         return try decoder.decode([UpcomingTask].self, from: data)
     }
 
-    func moveTaskToToday(id: String) async throws {
-        _ = try await request("/tasks/\(id)/move-to-today", method: "POST")
+    func moveTaskToToday(id: String, title: String) async throws {
+        // 既存todo-appに直接POST
+        let todoAppURL = "https://todo-app-api.d0ne1s-todo.workers.dev"
+        let url = URL(string: "\(todoAppURL)/todos")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let today = formatter.string(from: Date())
+
+        req.httpBody = try JSONEncoder().encode(["title": title, "date": today])
+
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let http = response as? HTTPURLResponse
+            throw APIError.httpError(statusCode: http?.statusCode ?? 0)
+        }
+
+        // 成功したらShelfから削除
+        try await deleteTask(id: id)
     }
 
     // MARK: - Comments
