@@ -1,0 +1,22 @@
+name = "todo-shelf-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "todo-shelf-db"
+database_id = "96200c31-66e0-48fe-94a5-b2f9a40523b9"
+migrations_dir = "migrations"
+
+[vars]
+TODO_APP_API_URL = "https://todo-app-api.d0ne1s-todo.workers.dev"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "todo-shelf-db-test"
+database_id = "96200c31-66e0-48fe-94a5-b2f9a40523b9"
+
+[env.test.vars]
+API_SECRET = "test-secret"
+TODO_APP_API_URL = "https://todo-app-api.d0ne1s-todo.workers.dev"
+TODO_APP_API_SECRET = "test-secret"

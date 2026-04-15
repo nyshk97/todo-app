@@ -69,25 +69,25 @@ API → Web → iOS（iOS は後日別計画）
 - [x] CLAUDE.md 作成
 
 ### Phase 2: API — データモデル & マイグレーション [AI🤖]
-- [ ] D1 マイグレーション作成
+- [x] D1 マイグレーション作成
   - `projects` テーブル（id, name, position, created_at, updated_at）
   - `sections` テーブル（id, project_id, name, position, created_at, updated_at）
   - `tasks` テーブル（id, project_id, section_id nullable, title, due_date nullable, position, created_at, updated_at）
   - `comments` テーブル（id, task_id, content, created_at, updated_at）
-- [ ] wrangler.toml 設定
+- [x] wrangler.toml 設定
 
 ### Phase 3: API — エンドポイント実装 [AI🤖]
-- [ ] 認証ミドルウェア（Bearer トークン）
-- [ ] プロジェクト CRUD: `GET /projects`, `POST /projects`, `PATCH /projects/:id`, `DELETE /projects/:id`
-- [ ] セクション CRUD: `GET /projects/:id/sections`, `POST /projects/:id/sections`, `PATCH /sections/:id`, `DELETE /sections/:id`
-- [ ] セクション並べ替え: `PATCH /projects/:id/sections/reorder`
-- [ ] タスク CRUD: `GET /projects/:id/tasks`, `POST /tasks`, `PATCH /tasks/:id`, `DELETE /tasks/:id`
-- [ ] タスク並べ替え・移動: `PATCH /tasks/:id`（project_id, section_id, position を更新）
-- [ ] タスク一括並べ替え: `PATCH /tasks/reorder`
-- [ ] コメント CRUD: `GET /tasks/:id/comments`, `POST /tasks/:id/comments`, `PATCH /comments/:id`, `DELETE /comments/:id`
-- [ ] 期日近接タスク取得: `GET /tasks/upcoming?days=3`
-- [ ] 既存todo-appへの移動: `POST /tasks/:id/move-to-today`（既存APIにPOST → Shelfから削除）
-- [ ] API テスト（Vitest + Miniflare）
+- [x] 認証ミドルウェア（Bearer トークン）
+- [x] プロジェクト CRUD: `GET /projects`, `POST /projects`, `PATCH /projects/:id`, `DELETE /projects/:id`
+- [x] セクション CRUD: `GET /projects/:id/sections`, `POST /projects/:id/sections`, `PATCH /sections/:id`, `DELETE /sections/:id`
+- [x] セクション並べ替え: `PATCH /projects/:id/sections/reorder`
+- [x] タスク CRUD: `GET /projects/:id/tasks`, `POST /tasks`, `PATCH /tasks/:id`, `DELETE /tasks/:id`
+- [x] タスク並べ替え・移動: `PATCH /tasks/:id`（project_id, section_id, position を更新）
+- [x] タスク一括並べ替え: `PATCH /tasks/reorder`
+- [x] コメント CRUD: `GET /tasks/:id/comments`, `POST /tasks/:id/comments`, `PATCH /comments/:id`, `DELETE /comments/:id`
+- [x] 期日近接タスク取得: `GET /tasks/upcoming?days=3`
+- [x] 既存todo-appへの移動: `POST /tasks/:id/move-to-today`（既存APIにPOST → Shelfから削除）
+- [x] API テスト（Vitest + Miniflare）
 
 ### Phase 3後の準備 [人間👨‍💻]
 - [ ] API をデプロイ: `wrangler deploy`
