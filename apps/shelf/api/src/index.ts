@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Bindings } from "./lib/db";
 import { auth } from "./middleware/auth";
 import projects from "./routes/projects";
@@ -7,6 +8,8 @@ import tasks from "./routes/tasks";
 import comments from "./routes/comments";
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+app.use("*", cors());
 
 app.get("/", (c) => c.json({ status: "ok" }));
 

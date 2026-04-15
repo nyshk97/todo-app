@@ -8,7 +8,7 @@
 
 ## API
 
-- 本番: (未デプロイ)
+- 本番: https://todo-shelf-api.d0ne1s-todo.workers.dev
 - 認証: `Authorization: Bearer <API_SECRET>`（値は `.env` で管理）
 - DB マイグレーション: `apps/api/migrations/` に SQL ファイルを追加し `npx wrangler d1 migrations apply todo-shelf-db --remote` で適用
 - D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと

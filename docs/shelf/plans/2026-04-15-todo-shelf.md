@@ -60,7 +60,7 @@ API → Web → iOS（iOS は後日別計画）
 - [x] ディレクトリリネーム: `mv ~/todo-app-future ~/todo-shelf`
 - [x] GitHub に `todo-shelf` リポジトリを作成
 - [x] Cloudflare ダッシュボードで D1 データベース `todo-shelf-db` を作成 (database_id: 96200c31-66e0-48fe-94a5-b2f9a40523b9)
-- [ ] Cloudflare Workers の API_SECRET を設定（`wrangler secret put API_SECRET`）— Phase 3 デプロイ後に実施
+- [x] Cloudflare Workers の API_SECRET を設定（`wrangler secret put API_SECRET`）— Phase 3 デプロイ後に実施
 
 ### Phase 1: プロジェクト基盤 [AI🤖]
 - [x] モノレポ初期構成（`apps/api`, `apps/web`, `packages/shared`, `package.json` workspaces）
@@ -90,18 +90,18 @@ API → Web → iOS（iOS は後日別計画）
 - [x] API テスト（Vitest + Miniflare）
 
 ### Phase 3後の準備 [人間👨‍💻]
-- [ ] API をデプロイ: `wrangler deploy`
-- [ ] D1 マイグレーション適用: `wrangler d1 migrations apply todo-shelf-db --remote`
+- [x] API をデプロイ: `wrangler deploy`
+- [x] D1 マイグレーション適用: `wrangler d1 migrations apply todo-shelf-db --remote`
 
 ### Phase 4: Web — 基盤 & プロジェクトビュー [AI🤖]
-- [ ] Vite + React + TypeScript プロジェクト初期構成
-- [ ] DESIGN.md 導入（`npx getdesign@latest add linear`）— Linear 風デザインシステム
-- [ ] API クライアント（fetch ラッパー + Bearer トークン）
-- [ ] ルーティング（React Router）: `/` → デフォルトプロジェクト表示
-- [ ] タブ型ナビゲーション（プロジェクト切り替え + 期日通知バッジ）
-- [ ] プロジェクトビュー: セクション一覧 + セクション未所属タスク表示
-- [ ] タスク追加（セクション内の「＋」ボタン + インライン入力）
-- [ ] タスク削除（確認ダイアログ付き）
+- [x] Vite + React + TypeScript プロジェクト初期構成
+- [x] DESIGN.md 導入（`npx getdesign@latest add linear`）— Linear 風デザインシステム
+- [x] API クライアント（fetch ラッパー + Bearer トークン）
+- [x] ルーティング（React Router）: `/` → デフォルトプロジェクト表示
+- [x] タブ型ナビゲーション（プロジェクト切り替え + 期日通知バッジ）
+- [x] プロジェクトビュー: セクション一覧 + セクション未所属タスク表示
+- [x] タスク追加（セクション内の「＋」ボタン + インライン入力）
+- [x] タスク削除（確認ダイアログ付き）
 
 ### Phase 5: Web — タスク詳細 & インタラクション [AI🤖]
 - [ ] タスク詳細パネル（クリックで開く）: タイトル編集、期日設定、コメント一覧
