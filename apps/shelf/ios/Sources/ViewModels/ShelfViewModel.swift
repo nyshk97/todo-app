@@ -1,0 +1,295 @@
+import Foundation
+
+@Observable
+@MainActor
+final class ShelfViewModel {
+    var projects: [Project] = []
+    var sections: [String: [Section]] = [:]  // projectId -> sections
+    var tasks: [String: [Task]] = [:]        // projectId -> tasks
+    var upcomingCount: Int = 0
+    var isLoading = false
+    var errorMessage: String?
+
+    private let api = APIClient.shared
+
+    // MARK: - Initial Load
+
+    func loadAll() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let projects = try await api.fetchProjects()
+            self.projects = projects.sorted { $0.position < $1.position }
+
+            async let upcomingResult = api.fetchUpcomingTasks()
+
+            for project in projects {
+                async let secs = api.fetchSections(projectId: project.id)
+                async let tsks = api.fetchTasks(projectId: project.id)
+                let (fetchedSections, fetchedTasks) = try await (secs, tsks)
+                self.sections[project.id] = fetchedSections.sorted { $0.position < $1.position }
+                self.tasks[project.id] = fetchedTasks.sorted { $0.position < $1.position }
+            }
+
+            let upcoming = try await upcomingResult
+            self.upcomingCount = upcoming.count
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    // MARK: - Projects
+
+    func createProject(name: String) async {
+        do {
+            let project = try await api.createProject(name: name)
+            projects.append(project)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateProject(_ project: Project, name: String) async {
+        do {
+            let updated = try await api.updateProject(id: project.id, name: name)
+            if let idx = projects.firstIndex(where: { $0.id == project.id }) {
+                projects[idx] = updated
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteProject(_ project: Project) async {
+        do {
+            try await api.deleteProject(id: project.id)
+            projects.removeAll { $0.id == project.id }
+            sections.removeValue(forKey: project.id)
+            tasks.removeValue(forKey: project.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Sections
+
+    func sectionsFor(projectId: String) -> [Section] {
+        sections[projectId] ?? []
+    }
+
+    func createSection(projectId: String, name: String) async {
+        do {
+            let section = try await api.createSection(projectId: projectId, name: name)
+            sections[projectId, default: []].append(section)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateSection(_ section: Section, name: String) async {
+        do {
+            let updated = try await api.updateSection(id: section.id, name: name)
+            if let idx = sections[section.projectId]?.firstIndex(where: { $0.id == section.id }) {
+                sections[section.projectId]?[idx] = updated
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteSection(_ section: Section) async {
+        do {
+            try await api.deleteSection(id: section.id)
+            sections[section.projectId]?.removeAll { $0.id == section.id }
+            // Tasks in this section become unsectioned
+            if let projectTasks = tasks[section.projectId] {
+                tasks[section.projectId] = projectTasks.map { task in
+                    if task.sectionId == section.id {
+                        var t = task
+                        t.sectionId = nil
+                        return t
+                    }
+                    return task
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func reorderSections(projectId: String, sectionIds: [String]) async {
+        let items = sectionIds.enumerated().map { (idx, id) in (id: id, position: idx) }
+        // Optimistic update
+        if var secs = sections[projectId] {
+            secs.sort { a, b in
+                let ai = sectionIds.firstIndex(of: a.id) ?? 0
+                let bi = sectionIds.firstIndex(of: b.id) ?? 0
+                return ai < bi
+            }
+            for i in secs.indices { secs[i].position = i }
+            sections[projectId] = secs
+        }
+        do {
+            try await api.reorderSections(projectId: projectId, items: items)
+        } catch {
+            errorMessage = error.localizedDescription
+            await loadAll()
+        }
+    }
+
+    // MARK: - Tasks
+
+    func tasksFor(projectId: String, sectionId: String?) -> [Task] {
+        (tasks[projectId] ?? []).filter { $0.sectionId == sectionId }.sorted { $0.position < $1.position }
+    }
+
+    func createTask(title: String, projectId: String, sectionId: String? = nil) async {
+        do {
+            let task = try await api.createTask(title: title, projectId: projectId, sectionId: sectionId)
+            tasks[projectId, default: []].append(task)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateTask(_ task: Task, title: String? = nil, dueDate: String?? = nil, projectId: String? = nil, sectionId: String?? = nil) async {
+        do {
+            let updated = try await api.updateTask(
+                id: task.id,
+                title: title,
+                projectId: projectId,
+                sectionId: sectionId,
+                dueDate: dueDate
+            )
+            replaceTask(old: task, new: updated)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteTask(_ task: Task) async {
+        do {
+            try await api.deleteTask(id: task.id)
+            tasks[task.projectId]?.removeAll { $0.id == task.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func moveTask(_ task: Task, toProjectId: String, sectionId: String?) async {
+        do {
+            let updated = try await api.updateTask(
+                id: task.id,
+                projectId: toProjectId,
+                sectionId: .some(sectionId)
+            )
+            tasks[task.projectId]?.removeAll { $0.id == task.id }
+            tasks[toProjectId, default: []].append(updated)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func reorderTasks(projectId: String, sectionId: String?, taskIds: [String]) async {
+        let items = taskIds.enumerated().map { (idx, id) in (id: id, position: idx) }
+        // Optimistic update
+        if var projectTasks = tasks[projectId] {
+            for i in projectTasks.indices {
+                if let newPos = taskIds.firstIndex(of: projectTasks[i].id) {
+                    projectTasks[i].position = newPos
+                }
+            }
+            tasks[projectId] = projectTasks
+        }
+        do {
+            try await api.reorderTasks(items: items)
+        } catch {
+            errorMessage = error.localizedDescription
+            await loadAll()
+        }
+    }
+
+    func moveTaskToToday(_ task: Task) async {
+        do {
+            try await api.moveTaskToToday(id: task.id)
+            tasks[task.projectId]?.removeAll { $0.id == task.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Comments
+
+    func fetchComments(taskId: String) async -> [Comment] {
+        do {
+            return try await api.fetchComments(taskId: taskId)
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func createComment(taskId: String, content: String) async -> Comment? {
+        do {
+            return try await api.createComment(taskId: taskId, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func updateComment(_ comment: Comment, content: String) async -> Comment? {
+        do {
+            return try await api.updateComment(id: comment.id, content: content)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func deleteComment(_ comment: Comment) async {
+        do {
+            try await api.deleteComment(id: comment.id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Local Reorder (for drag & drop)
+
+    func moveTaskLocally(projectId: String, fromIndex: Int, toIndex: Int, sectionId: String?) {
+        guard var projectTasks = tasks[projectId] else { return }
+        let sectionTasks = projectTasks.filter { $0.sectionId == sectionId }.sorted { $0.position < $1.position }
+        guard fromIndex < sectionTasks.count, toIndex < sectionTasks.count else { return }
+
+        let movingTask = sectionTasks[fromIndex]
+        let targetTask = sectionTasks[toIndex]
+
+        guard let fromGlobal = projectTasks.firstIndex(where: { $0.id == movingTask.id }),
+              let toGlobal = projectTasks.firstIndex(where: { $0.id == targetTask.id }) else { return }
+
+        let task = projectTasks.remove(at: fromGlobal)
+        projectTasks.insert(task, at: toGlobal)
+
+        // Update positions for section tasks
+        let updatedSectionTasks = projectTasks.filter { $0.sectionId == sectionId }
+        for (i, t) in updatedSectionTasks.enumerated() {
+            if let idx = projectTasks.firstIndex(where: { $0.id == t.id }) {
+                projectTasks[idx].position = i
+            }
+        }
+        tasks[projectId] = projectTasks
+    }
+
+    // MARK: - Helpers
+
+    private func replaceTask(old: Task, new: Task) {
+        if old.projectId != new.projectId {
+            tasks[old.projectId]?.removeAll { $0.id == old.id }
+            tasks[new.projectId, default: []].append(new)
+        } else if let idx = tasks[old.projectId]?.firstIndex(where: { $0.id == old.id }) {
+            tasks[old.projectId]?[idx] = new
+        }
+    }
+}
