@@ -6,17 +6,21 @@ import {
   useParams,
   useNavigate,
 } from "react-router-dom";
-import type { Project, Task, UpcomingTask } from "@todo-shelf/shared";
+import type { Project, Task, Section, UpcomingTask } from "@todo-shelf/shared";
 import { api } from "./lib/api";
 import { TabNav } from "./components/TabNav";
 import { ProjectView } from "./components/ProjectView";
+import { TaskDetail } from "./components/TaskDetail";
 
 function Shell() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [allSections, setAllSections] = useState<Section[]>([]);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -26,9 +30,15 @@ function Shell() {
       ]);
       setProjects(ps);
       setUpcomingCount(upcoming.length);
+
+      // Fetch all sections for move UI
+      const sectionResults = await Promise.all(
+        ps.map((p) => api.get<Section[]>(`/projects/${p.id}/sections`))
+      );
+      setAllSections(sectionResults.flat());
+
       setLoading(false);
 
-      // projectId が未指定 or 存在しないプロジェクトなら最初のプロジェクトへ
       if (ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
         navigate(`/projects/${ps[0].id}`, { replace: true });
       }
@@ -39,9 +49,21 @@ function Shell() {
     navigate(`/projects/${id}`);
   };
 
-  const handleClickTask = (task: Task) => {
-    // Phase 5 で詳細パネルを実装
-    console.log("task clicked:", task.id);
+  const handleTaskUpdate = (updated: Task) => {
+    setSelectedTask(updated);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleTaskDelete = async (id: string) => {
+    await api.delete(`/tasks/${id}`);
+    setSelectedTask(null);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleMoveToToday = async (id: string) => {
+    await api.post(`/tasks/${id}/move-to-today`, {});
+    setSelectedTask(null);
+    setRefreshKey((k) => k + 1);
   };
 
   if (loading) {
@@ -76,9 +98,9 @@ function Shell() {
       }}>
         {projectId ? (
           <ProjectView
-            key={projectId}
+            key={`${projectId}-${refreshKey}`}
             projectId={projectId}
-            onClickTask={handleClickTask}
+            onClickTask={setSelectedTask}
           />
         ) : (
           <div style={{
@@ -90,6 +112,18 @@ function Shell() {
           </div>
         )}
       </main>
+
+      {selectedTask && (
+        <TaskDetail
+          task={selectedTask}
+          projects={projects}
+          sections={allSections}
+          onUpdate={handleTaskUpdate}
+          onDelete={handleTaskDelete}
+          onMoveToToday={handleMoveToToday}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
     </div>
   );
 }
