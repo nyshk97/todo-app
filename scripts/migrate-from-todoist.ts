@@ -55,7 +55,7 @@ interface TodoistTask {
 
 interface TodoistComment {
   id: string;
-  task_id: string;
+  item_id: string;
   content: string;
   posted_at: string;
 }
@@ -178,7 +178,7 @@ async function main() {
 
   // コメント作成
   for (const c of allComments) {
-    const shelfTaskId = taskMap.get(c.task_id);
+    const shelfTaskId = taskMap.get(c.item_id);
     if (!shelfTaskId) continue;
     console.log(`    💬 コメント: ${c.content.slice(0, 40)}...`);
     await shelfPost(`/tasks/${shelfTaskId}/comments`, { content: c.content });
