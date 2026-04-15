@@ -1,5 +1,6 @@
 export type Bindings = {
   DB: D1Database;
+  ATTACHMENTS: R2Bucket;
   API_SECRET: string;
   TODO_APP_API_URL: string;
   TODO_APP_API_SECRET: string;

@@ -47,6 +47,7 @@ export interface Task {
   due_date: string | null; // YYYY-MM-DD
   position: number;
   comment_count: number;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +77,7 @@ export interface Comment {
   id: string;
   task_id: string;
   content: string;
+  attachments: Attachment[];
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +90,17 @@ export interface UpdateCommentRequest {
   content: string;
 }
 
+// --- Attachments ---
+
+export interface Attachment {
+  id: string;
+  comment_id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  created_at: string;
+}
+
 // --- API Responses ---
 
 export interface ProjectWithDetails extends Project {
@@ -96,5 +109,9 @@ export interface ProjectWithDetails extends Project {
 }
 
 export interface UpcomingTask extends Task {
+  project_name: string;
+}
+
+export interface ArchivedTask extends Task {
   project_name: string;
 }

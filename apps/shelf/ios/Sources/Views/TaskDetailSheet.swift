@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct TaskDetailSheet: View {
     let viewModel: ShelfViewModel
@@ -14,6 +15,9 @@ struct TaskDetailSheet: View {
     @State private var showMoveToTodayConfirm = false
     @State private var comments: [Comment] = []
     @State private var newCommentText = ""
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var pendingFiles: [(data: Data, filename: String, mimeType: String)] = []
+    @State private var showFilePicker = false
 
     var body: some View {
         NavigationStack {
@@ -67,13 +71,39 @@ struct TaskDetailSheet: View {
             }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("「\(task.title)」を今日のTODOに移動し、Shelfから削除します")
+            Text("「\(task.title)」を今日のTODOに移動します")
         }
         .sheet(isPresented: $showMoveSheet) {
             MoveTaskSheet(viewModel: viewModel, task: task, onDismiss: {
                 showMoveSheet = false
                 onDismiss()
             })
+        }
+        .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                for url in urls {
+                    guard pendingFiles.count < 5 else { break }
+                    guard url.startAccessingSecurityScopedResource() else { continue }
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        let mimeType = mimeTypeFor(url: url)
+                        pendingFiles.append((data: data, filename: url.lastPathComponent, mimeType: mimeType))
+                    }
+                }
+            }
+        }
+        .onChange(of: selectedPhotos) {
+            Swift.Task {
+                for item in selectedPhotos {
+                    guard pendingFiles.count < 5 else { break }
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        let mimeType = item.supportedContentTypes.first?.preferredMIMEType ?? "image/jpeg"
+                        let ext = mimeType.split(separator: "/").last.map(String.init) ?? "jpg"
+                        pendingFiles.append((data: data, filename: "photo.\(ext)", mimeType: mimeType))
+                    }
+                }
+                selectedPhotos = []
+            }
         }
     }
 
@@ -212,6 +242,7 @@ struct TaskDetailSheet: View {
             ForEach(comments) { comment in
                 CommentRow(
                     comment: comment,
+                    viewModel: viewModel,
                     onUpdate: { content in
                         if let updated = await viewModel.updateComment(comment, content: content) {
                             if let idx = comments.firstIndex(where: { $0.id == comment.id }) {
@@ -222,18 +253,66 @@ struct TaskDetailSheet: View {
                     onDelete: {
                         await viewModel.deleteComment(comment)
                         comments.removeAll { $0.id == comment.id }
+                    },
+                    onDeleteAttachment: { attachmentId in
+                        await viewModel.deleteAttachment(id: attachmentId)
+                        if let cIdx = comments.firstIndex(where: { $0.id == comment.id }) {
+                            comments[cIdx].attachments.removeAll { $0.id == attachmentId }
+                        }
                     }
                 )
             }
 
+            // Pending files preview
+            if !pendingFiles.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(pendingFiles.enumerated()), id: \.offset) { index, file in
+                        HStack(spacing: 8) {
+                            Image(systemName: "paperclip")
+                                .font(.caption2)
+                                .foregroundStyle(Theme.textQuaternary)
+                            Text(file.filename)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textTertiary)
+                                .lineLimit(1)
+                            Spacer()
+                            Button {
+                                pendingFiles.remove(at: index)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Theme.textQuaternary)
+                            }
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Theme.bgElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
             // Add comment
             HStack(spacing: 8) {
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: max(0, 5 - pendingFiles.count), matching: .images) {
+                    Image(systemName: "photo")
+                        .foregroundStyle(Theme.textTertiary)
+                        .font(.subheadline)
+                }
+
+                Button {
+                    showFilePicker = true
+                } label: {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(Theme.textTertiary)
+                        .font(.subheadline)
+                }
+
                 TextField("コメントを追加", text: $newCommentText)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Theme.textPrimary)
                     .onSubmit { submitComment() }
 
-                if !newCommentText.isEmpty {
+                if !newCommentText.isEmpty || !pendingFiles.isEmpty {
                     Button { submitComment() } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .foregroundStyle(Theme.textTertiary)
@@ -251,12 +330,30 @@ struct TaskDetailSheet: View {
 
     private func submitComment() {
         let content = newCommentText.trimmingCharacters(in: .whitespaces)
-        guard !content.isEmpty else { return }
+        guard !content.isEmpty || !pendingFiles.isEmpty else { return }
+        let filesToSend = pendingFiles
         newCommentText = ""
+        pendingFiles = []
         Swift.Task {
-            if let comment = await viewModel.createComment(taskId: task.id, content: content) {
+            if let comment = await viewModel.createComment(taskId: task.id, content: content, files: filesToSend) {
                 comments.append(comment)
             }
+        }
+    }
+
+    private func mimeTypeFor(url: URL) -> String {
+        let ext = url.pathExtension.lowercased()
+        switch ext {
+        case "jpg", "jpeg": return "image/jpeg"
+        case "png": return "image/png"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        case "heic": return "image/heic"
+        case "pdf": return "application/pdf"
+        case "txt": return "text/plain"
+        case "json": return "application/json"
+        case "zip": return "application/zip"
+        default: return "application/octet-stream"
         }
     }
 }
@@ -265,8 +362,10 @@ struct TaskDetailSheet: View {
 
 struct CommentRow: View {
     let comment: Comment
+    let viewModel: ShelfViewModel
     let onUpdate: (String) async -> Void
     let onDelete: () async -> Void
+    let onDeleteAttachment: (String) async -> Void
 
     @State private var isEditing = false
     @State private var editText = ""
@@ -285,9 +384,18 @@ struct CommentRow: View {
                         isEditing = false
                     }
             } else {
-                linkedText(comment.content)
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.textSecondary)
+                if !comment.content.isEmpty {
+                    linkedText(comment.content)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+
+            // Attachments
+            ForEach(comment.attachments) { attachment in
+                AttachmentView(attachment: attachment, viewModel: viewModel) {
+                    Swift.Task { await onDeleteAttachment(attachment.id) }
+                }
             }
 
             Text(formatTimestamp(comment.createdAt))

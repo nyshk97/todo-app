@@ -30,6 +30,42 @@ actor APIClient {
         return data
     }
 
+    private func multipartRequest(_ path: String, content: String, files: [(data: Data, filename: String, mimeType: String)]) async throws -> Data {
+        let url = URL(string: "\(baseURL)\(path)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+
+        let boundary = UUID().uuidString
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+
+        // Content field
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"content\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(content)\r\n".data(using: .utf8)!)
+
+        // File fields
+        for file in files {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"files\"; filename=\"\(file.filename)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
+            body.append(file.data)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let http = response as? HTTPURLResponse
+            throw APIError.httpError(statusCode: http?.statusCode ?? 0)
+        }
+        return data
+    }
+
     // MARK: - Projects
 
     func fetchProjects() async throws -> [Project] {
@@ -148,8 +184,20 @@ actor APIClient {
             throw APIError.httpError(statusCode: http?.statusCode ?? 0)
         }
 
-        // 成功したらShelfから削除
-        try await deleteTask(id: id)
+        // Shelf側でアーカイブ（サーバーも同じ処理をするが、iOS版はサーバーAPIを呼ぶ）
+        _ = try await request("/tasks/\(id)/move-to-today", method: "POST")
+    }
+
+    // MARK: - Archive
+
+    func fetchArchivedTasks() async throws -> [ArchivedTask] {
+        let data = try await request("/tasks/archived")
+        return try decoder.decode([ArchivedTask].self, from: data)
+    }
+
+    func restoreTask(id: String) async throws -> Task {
+        let data = try await request("/tasks/\(id)/restore", method: "POST")
+        return try decoder.decode(Task.self, from: data)
     }
 
     // MARK: - Comments
@@ -159,8 +207,8 @@ actor APIClient {
         return try decoder.decode([Comment].self, from: data)
     }
 
-    func createComment(taskId: String, content: String) async throws -> Comment {
-        let data = try await request("/tasks/\(taskId)/comments", method: "POST", body: ["content": content])
+    func createComment(taskId: String, content: String, files: [(data: Data, filename: String, mimeType: String)] = []) async throws -> Comment {
+        let data = try await multipartRequest("/tasks/\(taskId)/comments", content: content, files: files)
         return try decoder.decode(Comment.self, from: data)
     }
 
@@ -171,6 +219,16 @@ actor APIClient {
 
     func deleteComment(id: String) async throws {
         _ = try await request("/comments/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Attachments
+
+    func deleteAttachment(id: String) async throws {
+        _ = try await request("/attachments/\(id)", method: "DELETE")
+    }
+
+    nonisolated func attachmentURL(id: String) -> URL {
+        URL(string: "\(baseURL)/attachments/\(id)?token=\(secret)")!
     }
 }
 

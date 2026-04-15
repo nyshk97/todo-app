@@ -2,6 +2,10 @@ name = "todo-shelf-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "todo-shelf-attachments"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "todo-shelf-db"

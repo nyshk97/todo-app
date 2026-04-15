@@ -14,6 +14,25 @@ struct ProjectView: View {
 
         ScrollView {
             LazyVStack(spacing: 0) {
+                // Header
+                let project = viewModel.projects.first(where: { $0.id == projectId })
+                let totalTasks = (viewModel.tasks[projectId] ?? []).count
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(project?.name ?? "")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Theme.textPrimary)
+
+                    Text("\(totalTasks) items")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+
                 // Unsectioned tasks
                 if !unsectionedTasks.isEmpty {
                     TaskListView(

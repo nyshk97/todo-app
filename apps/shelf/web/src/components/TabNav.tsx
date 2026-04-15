@@ -78,6 +78,23 @@ export function TabNav({ projects, activeId, upcomingCount, onSelect, onProjects
       ))}
 
       <button
+        onClick={() => onSelect("__archive__")}
+        style={{
+          padding: "8px 20px",
+          borderRadius: "var(--radius-md)",
+          border: "none",
+          background: activeId === "__archive__" ? "rgba(255,255,255,0.1)" : "transparent",
+          color: activeId === "__archive__" ? "var(--text-primary)" : "var(--text-tertiary)",
+          fontSize: 14,
+          fontWeight: activeId === "__archive__" ? 600 : 510,
+          transition: "all 0.15s",
+          cursor: "pointer",
+        }}
+      >
+        Archive
+      </button>
+
+      <button
         onClick={() => setShowMenu(!showMenu)}
         style={{
           padding: "4px 8px",

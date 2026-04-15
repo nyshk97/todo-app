@@ -214,6 +214,41 @@ final class ShelfViewModel {
         do {
             try await api.moveTaskToToday(id: task.id, title: task.title)
             tasks[task.projectId]?.removeAll { $0.id == task.id }
+            // Refresh archived tasks if they were loaded
+            if !archivedTasks.isEmpty {
+                await fetchArchivedTasks()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Archive
+
+    var archivedTasks: [ArchivedTask] = []
+
+    func fetchArchivedTasks() async {
+        do {
+            archivedTasks = try await api.fetchArchivedTasks()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func restoreTask(_ archivedTask: ArchivedTask) async {
+        do {
+            let task = try await api.restoreTask(id: archivedTask.id)
+            archivedTasks.removeAll { $0.id == archivedTask.id }
+            tasks[task.projectId, default: []].append(task)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteArchivedTask(_ archivedTask: ArchivedTask) async {
+        do {
+            try await api.deleteTask(id: archivedTask.id)
+            archivedTasks.removeAll { $0.id == archivedTask.id }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -230,9 +265,9 @@ final class ShelfViewModel {
         }
     }
 
-    func createComment(taskId: String, content: String) async -> Comment? {
+    func createComment(taskId: String, content: String, files: [(data: Data, filename: String, mimeType: String)] = []) async -> Comment? {
         do {
-            return try await api.createComment(taskId: taskId, content: content)
+            return try await api.createComment(taskId: taskId, content: content, files: files)
         } catch {
             errorMessage = error.localizedDescription
             return nil
@@ -254,6 +289,20 @@ final class ShelfViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Attachments
+
+    func deleteAttachment(id: String) async {
+        do {
+            try await api.deleteAttachment(id: id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    nonisolated func attachmentURL(id: String) -> URL {
+        APIClient.shared.attachmentURL(id: id)
     }
 
     // MARK: - Local Reorder (for drag & drop)

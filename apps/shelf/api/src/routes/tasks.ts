@@ -20,7 +20,7 @@ app.get("/tasks/upcoming", async (c) => {
   const results = await c.env.DB.prepare(
     `SELECT t.*, p.name as project_name
      FROM tasks t JOIN projects p ON t.project_id = p.id
-     WHERE t.due_date IS NOT NULL AND t.due_date <= ?
+     WHERE t.due_date IS NOT NULL AND t.due_date <= ? AND t.archived_at IS NULL
      ORDER BY t.due_date, t.position`
   )
     .bind(endDate)
@@ -41,6 +41,63 @@ app.patch("/tasks/reorder", async (c) => {
   return c.json({ ok: true });
 });
 
+// GET /tasks/archived
+app.get("/tasks/archived", async (c) => {
+  const results = await c.env.DB.prepare(
+    `SELECT t.*, p.name as project_name, COALESCE(cc.cnt, 0) as comment_count
+     FROM tasks t
+     JOIN projects p ON t.project_id = p.id
+     LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM comments GROUP BY task_id) cc ON cc.task_id = t.id
+     WHERE t.archived_at IS NOT NULL
+     ORDER BY t.archived_at DESC`
+  ).all();
+  return c.json(results.results);
+});
+
+// POST /tasks/:id/restore
+app.post("/tasks/:id/restore", async (c) => {
+  const id = c.req.param("id");
+  const task = await c.env.DB.prepare("SELECT * FROM tasks WHERE id = ?")
+    .bind(id)
+    .first<{ id: string; project_id: string; section_id: string | null; archived_at: string | null }>();
+  if (!task) return c.json({ error: "Not found" }, 404);
+  if (!task.archived_at) return c.json({ error: "Task is not archived" }, 400);
+
+  // Check if original section still exists
+  let sectionId = task.section_id;
+  if (sectionId) {
+    const section = await c.env.DB.prepare("SELECT id FROM sections WHERE id = ?")
+      .bind(sectionId)
+      .first();
+    if (!section) sectionId = null;
+  }
+
+  const now = nowJST();
+  const maxPos = await c.env.DB.prepare(
+    sectionId
+      ? "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id = ? AND archived_at IS NULL"
+      : "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id IS NULL AND archived_at IS NULL"
+  )
+    .bind(...(sectionId ? [task.project_id, sectionId] : [task.project_id]))
+    .first<{ max_pos: number }>();
+
+  const sectionClause = sectionId ? "section_id = ?" : "section_id = NULL";
+  const bindings: unknown[] = [];
+  if (sectionId) bindings.push(sectionId);
+  bindings.push((maxPos?.max_pos ?? -1) + 1, now, id);
+
+  await c.env.DB.prepare(
+    `UPDATE tasks SET archived_at = NULL, ${sectionClause}, position = ?, updated_at = ? WHERE id = ?`
+  )
+    .bind(...bindings)
+    .run();
+
+  const restored = await c.env.DB.prepare("SELECT * FROM tasks WHERE id = ?")
+    .bind(id)
+    .first();
+  return c.json(restored);
+});
+
 // GET /projects/:id/tasks
 app.get("/projects/:id/tasks", async (c) => {
   const projectId = c.req.param("id");
@@ -48,7 +105,7 @@ app.get("/projects/:id/tasks", async (c) => {
     `SELECT t.*, COALESCE(cc.cnt, 0) as comment_count
      FROM tasks t
      LEFT JOIN (SELECT task_id, COUNT(*) as cnt FROM comments GROUP BY task_id) cc ON cc.task_id = t.id
-     WHERE t.project_id = ?
+     WHERE t.project_id = ? AND t.archived_at IS NULL
      ORDER BY t.position`
   )
     .bind(projectId)
@@ -68,8 +125,8 @@ app.post("/tasks", async (c) => {
 
   const maxPos = await c.env.DB.prepare(
     body.section_id
-      ? "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id = ?"
-      : "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id IS NULL"
+      ? "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id = ? AND archived_at IS NULL"
+      : "SELECT COALESCE(MAX(position), -1) as max_pos FROM tasks WHERE project_id = ? AND section_id IS NULL AND archived_at IS NULL"
   )
     .bind(
       ...(body.section_id
@@ -131,6 +188,19 @@ app.delete("/tasks/:id", async (c) => {
     .first();
   if (!existing) return c.json({ error: "Not found" }, 404);
 
+  // Delete R2 files for all comments on this task
+  const attachments = await c.env.DB.prepare(
+    `SELECT a.r2_key FROM attachments a
+     JOIN comments c ON a.comment_id = c.id
+     WHERE c.task_id = ?`
+  )
+    .bind(id)
+    .all();
+
+  for (const a of attachments.results) {
+    await c.env.ATTACHMENTS.delete(a.r2_key as string);
+  }
+
   await c.env.DB.prepare("DELETE FROM tasks WHERE id = ?").bind(id).run();
   return c.body(null, 204);
 });
@@ -159,7 +229,14 @@ app.post("/tasks/:id/move-to-today", async (c) => {
     return c.json({ error: "Failed to create todo in todo-app" }, 502);
   }
 
-  await c.env.DB.prepare("DELETE FROM tasks WHERE id = ?").bind(id).run();
+  // Archive instead of delete
+  const now = nowJST();
+  await c.env.DB.prepare(
+    "UPDATE tasks SET archived_at = ?, updated_at = ? WHERE id = ?"
+  )
+    .bind(now, now, id)
+    .run();
+
   return c.json({ ok: true });
 });
 

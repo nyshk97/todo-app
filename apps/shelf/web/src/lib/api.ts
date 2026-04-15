@@ -27,4 +27,7 @@ export const api = {
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", json: body }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", json: body }),
   delete: (path: string) => request<void>(path, { method: "DELETE" }),
+  postForm: <T>(path: string, formData: FormData) =>
+    request<T>(path, { method: "POST", body: formData }),
+  attachmentUrl: (id: string) => `${API_URL}/attachments/${id}?token=${API_SECRET}`,
 };

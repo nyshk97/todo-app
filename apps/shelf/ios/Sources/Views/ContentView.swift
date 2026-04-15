@@ -16,6 +16,12 @@ struct ContentView: View {
                             .tag(Optional(project.id))
                             .badge(badgeCount(for: project.id))
                     }
+
+                    ArchiveView(viewModel: viewModel)
+                        .tabItem {
+                            Label("Archive", systemImage: "archivebox")
+                        }
+                        .tag(Optional("__archive__"))
                 }
                 .tint(Theme.textPrimary)
             } else if !viewModel.isLoading && viewModel.projects.isEmpty {

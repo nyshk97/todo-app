@@ -5,22 +5,27 @@ import {
   Route,
   useParams,
   useNavigate,
+  useLocation,
 } from "react-router-dom";
 import type { Project, Task, Section, UpcomingTask } from "@todo-shelf/shared";
 import { api } from "./lib/api";
 import { TabNav } from "./components/TabNav";
 import { ProjectView } from "./components/ProjectView";
 import { TaskDetail } from "./components/TaskDetail";
+import { ArchiveView } from "./components/ArchiveView";
 
 function Shell() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [allSections, setAllSections] = useState<Section[]>([]);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const isArchive = location.pathname === "/archive";
 
   useEffect(() => {
     (async () => {
@@ -39,14 +44,18 @@ function Shell() {
 
       setLoading(false);
 
-      if (ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
+      if (!isArchive && ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
         navigate(`/projects/${ps[0].id}`, { replace: true });
       }
     })();
   }, []);
 
   const handleSelect = (id: string) => {
-    navigate(`/projects/${id}`);
+    if (id === "__archive__") {
+      navigate("/archive");
+    } else {
+      navigate(`/projects/${id}`);
+    }
   };
 
   const handleTaskUpdate = (updated: Task) => {
@@ -84,7 +93,7 @@ function Shell() {
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <TabNav
         projects={projects}
-        activeId={projectId ?? null}
+        activeId={isArchive ? "__archive__" : (projectId ?? null)}
         upcomingCount={upcomingCount}
         onSelect={handleSelect}
         onProjectsChange={setProjects}
@@ -97,7 +106,13 @@ function Shell() {
         margin: "0 auto",
         padding: "0 16px",
       }}>
-        {projectId ? (
+        {isArchive ? (
+          <ArchiveView
+            key={refreshKey}
+            projects={projects}
+            sections={allSections}
+          />
+        ) : projectId ? (
           <ProjectView
             key={`${projectId}-${refreshKey}`}
             projectId={projectId}
@@ -114,7 +129,7 @@ function Shell() {
         )}
       </main>
 
-      {selectedTask && (
+      {selectedTask && !isArchive && (
         <TaskDetail
           task={selectedTask}
           projects={projects}
@@ -134,6 +149,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/projects/:projectId" element={<Shell />} />
+        <Route path="/archive" element={<Shell />} />
         <Route path="*" element={<Shell />} />
       </Routes>
     </BrowserRouter>
