@@ -46,6 +46,15 @@
 - API URL・シークレットは `apps/ios/Sources/Secrets.swift` と `APIClient.swift` にハードコード
 - `DEVELOPMENT_TEAM` は project.yml でプレースホルダー（Xcode で初回ビルド時に自動設定される）
 
+## dnd-kit
+
+- 複数コンテナ間 D&D では `closestCenter` ではなくカスタム collision detection を使い、タスク要素を droppable ゾーンより優先する
+- 同一コンテナ内の並べ替えは `arrayMove` を使う（手動 splice はドラッグ方向でズレる）
+
+## iOS
+
+- SwiftUI の `.onDrag`/`.onDrop` はセクション間移動に不向き（アニメーション制御の限界、スクロールとの競合）。セクション間の移動は「移動」シートで対応する方針
+
 ## コンセプト
 
 - Todoist 代替。「今すぐやらないけど忘れたくないこと」を管理する場所
