@@ -212,7 +212,11 @@ final class ShelfViewModel {
 
     func moveTaskToToday(_ task: Task) async {
         do {
-            try await api.moveTaskToToday(id: task.id, title: task.title)
+            let sectionName = task.sectionId.flatMap { sid in
+                sections[task.projectId]?.first { $0.id == sid }?.name
+            }
+            let title = sectionName.map { "[\($0)] \(task.title)" } ?? task.title
+            try await api.moveTaskToToday(id: task.id, title: title)
             tasks[task.projectId]?.removeAll { $0.id == task.id }
             // Refresh archived tasks if they were loaded
             if !archivedTasks.isEmpty {

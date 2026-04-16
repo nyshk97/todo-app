@@ -83,7 +83,12 @@ function Shell() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${todoAppSecret}`,
       },
-      body: JSON.stringify({ title: task.title, date: today }),
+      body: JSON.stringify({
+        title: task.section_id
+          ? `[${allSections.find((s) => s.id === task.section_id)?.name}] ${task.title}`
+          : task.title,
+        date: today,
+      }),
     });
     if (!res.ok) {
       throw new Error("Failed to create todo in todo-app");
