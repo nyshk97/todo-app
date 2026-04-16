@@ -9,11 +9,21 @@ import {
 } from "react-router-dom";
 import type { Project, Task, Section, UpcomingTask } from "@todo-shelf/shared";
 import { api } from "./lib/api";
-import { TabNav } from "./components/TabNav";
+import { Header } from "./components/Header";
+import { Fab } from "./components/Fab";
 import { ProjectView } from "./components/ProjectView";
 import { TaskDetail } from "./components/TaskDetail";
 import { ArchiveView } from "./components/ArchiveView";
 import { ToastProvider, useToast } from "./components/Toast";
+
+/** Find the "main" project (Shelf or Deck, or first project) */
+function findMainProject(projects: Project[]): Project | undefined {
+  return (
+    projects.find((p) => p.name === "Shelf") ??
+    projects.find((p) => p.name === "Deck") ??
+    projects[0]
+  );
+}
 
 function Shell() {
   const { projectId } = useParams();
@@ -21,7 +31,7 @@ function Shell() {
   const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [allSections, setAllSections] = useState<Section[]>([]);
-  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [vaultUpcomingCount, setVaultUpcomingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -36,7 +46,14 @@ function Shell() {
         api.get<UpcomingTask[]>("/tasks/upcoming?days=3"),
       ]);
       setProjects(ps);
-      setUpcomingCount(upcoming.length);
+
+      // Count upcoming tasks in Vault project only
+      const vaultProject = ps.find((p) => p.name === "Vault");
+      if (vaultProject) {
+        setVaultUpcomingCount(
+          upcoming.filter((t) => t.project_id === vaultProject.id).length
+        );
+      }
 
       // Fetch all sections for move UI
       const sectionResults = await Promise.all(
@@ -46,18 +63,16 @@ function Shell() {
 
       setLoading(false);
 
+      // Default: navigate to main project
       if (!isArchive && ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
-        navigate(`/projects/${ps[0].id}`, { replace: true });
+        const main = findMainProject(ps);
+        if (main) navigate(`/projects/${main.id}`, { replace: true });
       }
     })();
   }, []);
 
-  const handleSelect = (id: string) => {
-    if (id === "__archive__") {
-      navigate("/archive");
-    } else {
-      navigate(`/projects/${id}`);
-    }
+  const handleNavigate = (path: string) => {
+    navigate(path);
   };
 
   const handleTaskUpdate = (updated: Task) => {
@@ -80,7 +95,6 @@ function Shell() {
     const task = selectedTask;
     if (!task) return;
 
-    // 1. todo-appにタスク作成（クライアントから直接）
     const todoAppUrl = import.meta.env.VITE_TODO_APP_API_URL ?? "http://localhost:8788";
     const todoAppSecret = import.meta.env.VITE_API_SECRET ?? "";
     const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -101,7 +115,6 @@ function Shell() {
       throw new Error("Failed to create todo in todo-app");
     }
 
-    // 2. Shelf側でアーカイブ
     await api.post(`/tasks/${id}/move-to-today`, {});
     setSelectedTask(null);
     setRefreshKey((k) => k + 1);
@@ -121,14 +134,35 @@ function Shell() {
     );
   }
 
+  // Determine current view context
+  const mainProject = findMainProject(projects);
+  const currentProject = projects.find((p) => p.id === projectId);
+  const isMainProject = currentProject?.id === mainProject?.id;
+  const showFab = isMainProject && !isArchive;
+
+  // Header props
+  let headerTitle = "Shelf";
+  let backTo: string | undefined;
+  let backLabel: string | undefined;
+
+  if (isArchive) {
+    headerTitle = "Archive";
+    backTo = mainProject ? `/projects/${mainProject.id}` : undefined;
+    backLabel = mainProject?.name ?? "Shelf";
+  } else if (currentProject && !isMainProject) {
+    headerTitle = currentProject.name;
+    backTo = mainProject ? `/projects/${mainProject.id}` : undefined;
+    backLabel = mainProject?.name ?? "Shelf";
+  } else if (currentProject) {
+    headerTitle = currentProject.name;
+  }
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <TabNav
-        projects={projects}
-        activeId={isArchive ? "__archive__" : (projectId ?? null)}
-        upcomingCount={upcomingCount}
-        onSelect={handleSelect}
-        onProjectsChange={setProjects}
+      <Header
+        title={headerTitle}
+        backTo={backTo}
+        backLabel={backLabel}
       />
       <main style={{
         flex: 1,
@@ -160,6 +194,15 @@ function Shell() {
           </div>
         )}
       </main>
+
+      {showFab && (
+        <Fab
+          projects={projects}
+          vaultUpcomingCount={vaultUpcomingCount}
+          onNavigate={handleNavigate}
+          onProjectsChange={setProjects}
+        />
+      )}
 
       {selectedTask && !isArchive && (
         <TaskDetail

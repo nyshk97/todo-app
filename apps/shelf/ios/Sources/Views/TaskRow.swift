@@ -6,6 +6,15 @@ struct TaskRow: View {
     let onTap: () -> Void
     let onDelete: () -> Void
 
+    private var rowBackground: Color {
+        guard let dueDate = task.dueDate else { return .clear }
+        switch DueDateBadge.computeStatus(dueDate) {
+        case .overdue: return Theme.red.opacity(0.08)
+        case .soon: return Theme.orange.opacity(0.06)
+        case .normal: return .clear
+        }
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 8) {
@@ -35,6 +44,7 @@ struct TaskRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .background(rowBackground)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -81,11 +91,11 @@ struct DueDateBadge: View {
         }
     }
 
-    private enum DueStatus {
+    enum DueStatus {
         case overdue, soon, normal
     }
 
-    private var dueDateStatus: DueStatus {
+    static func computeStatus(_ dateString: String) -> DueStatus {
         guard let date = DateHelper.parseDate(dateString) else { return .normal }
         let jst = TimeZone(identifier: "Asia/Tokyo")!
         var cal = Calendar.current
@@ -95,6 +105,10 @@ struct DueDateBadge: View {
         if days < 0 { return .overdue }
         if days <= 3 { return .soon }
         return .normal
+    }
+
+    private var dueDateStatus: DueStatus {
+        Self.computeStatus(dateString)
     }
 }
 

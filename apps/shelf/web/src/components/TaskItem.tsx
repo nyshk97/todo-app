@@ -16,6 +16,11 @@ const dueDateColors: Record<string, string> = {
   normal: "var(--text-quaternary)",
 };
 
+const dueDateBgColors: Record<string, string> = {
+  overdue: "rgba(239, 68, 68, 0.08)",
+  soon: "rgba(245, 158, 11, 0.06)",
+};
+
 export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const status = getDueDateStatus(task.due_date);
@@ -35,6 +40,11 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const bgColor = (status && dueDateBgColors[status]) ?? "transparent";
+  const hoverBgColor = (status && dueDateBgColors[status])
+    ? status === "overdue" ? "rgba(239, 68, 68, 0.12)" : "rgba(245, 158, 11, 0.10)"
+    : "rgba(255,255,255,0.03)";
+
   return (
     <div
       ref={setNodeRef}
@@ -47,10 +57,11 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
         borderRadius: "var(--radius-sm)",
         cursor: "pointer",
         transition: "background 0.1s",
+        background: bgColor,
       }}
       onClick={() => onClick(task)}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = hoverBgColor)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = bgColor)}
     >
       <span
         {...attributes}
