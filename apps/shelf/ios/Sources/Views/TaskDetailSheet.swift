@@ -253,6 +253,8 @@ struct TaskDetailSheet: View {
                     onDelete: {
                         await viewModel.deleteComment(comment)
                         comments.removeAll { $0.id == comment.id }
+                        task.commentCount -= 1
+                        viewModel.updateCommentCount(taskId: task.id, projectId: task.projectId, delta: -1)
                     },
                     onDeleteAttachment: { attachmentId in
                         await viewModel.deleteAttachment(id: attachmentId)
@@ -307,10 +309,19 @@ struct TaskDetailSheet: View {
                         .font(.subheadline)
                 }
 
-                TextField("コメントを追加", text: $newCommentText)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(Theme.textPrimary)
-                    .onSubmit { submitComment() }
+                ZStack(alignment: .leading) {
+                    if newCommentText.isEmpty {
+                        Text("コメントを追加")
+                            .foregroundStyle(Theme.textQuaternary)
+                            .font(.subheadline)
+                    }
+                    TextEditor(text: $newCommentText)
+                        .foregroundStyle(Theme.textPrimary)
+                        .font(.subheadline)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 20, maxHeight: 100)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if !newCommentText.isEmpty || !pendingFiles.isEmpty {
                     Button { submitComment() } label: {
@@ -337,6 +348,8 @@ struct TaskDetailSheet: View {
         Swift.Task {
             if let comment = await viewModel.createComment(taskId: task.id, content: content, files: filesToSend) {
                 comments.append(comment)
+                task.commentCount += 1
+                viewModel.updateCommentCount(taskId: task.id, projectId: task.projectId, delta: 1)
             }
         }
     }

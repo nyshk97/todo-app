@@ -68,7 +68,7 @@ export interface UpdateTaskRequest {
 }
 
 export interface ReorderRequest {
-  items: { id: string; position: number }[];
+  items: { id: string; position: number; section_id?: string | null }[];
 }
 
 // --- Comments ---

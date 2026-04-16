@@ -32,11 +32,22 @@ app.get("/tasks/upcoming", async (c) => {
 app.patch("/tasks/reorder", async (c) => {
   const body = await c.req.json<ReorderRequest>();
   const now = nowJST();
-  const stmts = body.items.map((item) =>
-    c.env.DB.prepare(
+  const stmts = body.items.map((item) => {
+    if ("section_id" in item) {
+      return c.env.DB.prepare(
+        item.section_id === null
+          ? "UPDATE tasks SET position = ?, section_id = NULL, updated_at = ? WHERE id = ?"
+          : "UPDATE tasks SET position = ?, section_id = ?, updated_at = ? WHERE id = ?"
+      ).bind(
+        ...(item.section_id === null
+          ? [item.position, now, item.id]
+          : [item.position, item.section_id, now, item.id])
+      );
+    }
+    return c.env.DB.prepare(
       "UPDATE tasks SET position = ?, updated_at = ? WHERE id = ?"
-    ).bind(item.position, now, item.id)
-  );
+    ).bind(item.position, now, item.id);
+  });
   await c.env.DB.batch(stmts);
   return c.json({ ok: true });
 });

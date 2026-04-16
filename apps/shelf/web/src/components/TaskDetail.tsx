@@ -88,6 +88,7 @@ export function TaskDetail({
     setNewComment("");
     setPendingFiles([]);
     setSubmitting(false);
+    onUpdate({ ...task, comment_count: task.comment_count + 1 });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,6 +125,7 @@ export function TaskDetail({
   const handleDeleteComment = async (id: string) => {
     await api.delete(`/comments/${id}`);
     setComments((prev) => prev.filter((c) => c.id !== id));
+    onUpdate({ ...task, comment_count: task.comment_count - 1 });
   };
 
   const handleMove = async (projectId: string, sectionId: string | null) => {
@@ -584,11 +586,16 @@ export function TaskDetail({
                 >
                   📎
                 </button>
-                <input
+                <textarea
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment(); } }}
-                  placeholder="コメントを追加..."
+                  onChange={(e) => {
+                    setNewComment(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment(); } }}
+                  placeholder="コメントを追加...（⌘+Enter で送信）"
+                  rows={1}
                   style={{
                     flex: 1,
                     background: "rgba(255,255,255,0.02)",
@@ -598,6 +605,10 @@ export function TaskDetail({
                     padding: "6px 8px",
                     fontSize: 13,
                     outline: "none",
+                    resize: "none",
+                    overflow: "hidden",
+                    fontFamily: "inherit",
+                    lineHeight: "1.5",
                   }}
                 />
                 <button

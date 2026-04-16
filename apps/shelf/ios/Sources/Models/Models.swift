@@ -37,7 +37,7 @@ struct Task: Codable, Identifiable, Equatable {
     var title: String
     var dueDate: String?
     var position: Int
-    let commentCount: Int
+    var commentCount: Int
     var archivedAt: String?
     let createdAt: String
     let updatedAt: String

@@ -1,18 +1,10 @@
 import { useState } from "react";
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
   SortableContext,
   verticalListSortingStrategy,
-  arrayMove,
   useSortable,
 } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { Section, Task } from "@todo-shelf/shared";
 import { TaskItem } from "./TaskItem";
@@ -24,7 +16,6 @@ interface SectionViewProps {
   onAddTask: (title: string, sectionId: string | null) => void;
   onDeleteTask: (id: string) => void;
   onClickTask: (task: Task) => void;
-  onReorderTasks: (items: { id: string; position: number }[]) => void;
   onRenameSection?: (id: string, name: string) => void;
   onDeleteSection?: (id: string) => void;
   sortableId?: string;
@@ -243,26 +234,14 @@ export function SectionView({
   onAddTask,
   onDeleteTask,
   onClickTask,
-  onReorderTasks,
   onRenameSection,
   onDeleteSection,
   sortableId,
 }: SectionViewProps) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
+  const droppableId = section ? `droppable-section-${section.id}` : "droppable-unsectioned";
+  const { setNodeRef: setDroppableRef } = useDroppable({ id: droppableId });
 
   const sortable = useSortable({ id: sortableId ?? "unsectioned", disabled: !sortableId });
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = tasks.findIndex((t) => t.id === active.id);
-    const newIndex = tasks.findIndex((t) => t.id === over.id);
-    const reordered = arrayMove(tasks, oldIndex, newIndex);
-    onReorderTasks(reordered.map((t, i) => ({ id: t.id, position: i })));
-  };
 
   const style = sortableId
     ? {
@@ -282,8 +261,8 @@ export function SectionView({
           dragHandleProps={sortableId ? { ...sortable.attributes, ...sortable.listeners } : undefined}
         />
       )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+      <div ref={setDroppableRef} style={{ minHeight: 8 }}>
+        <SortableContext items={tasks.map((t) => `task-${t.id}`)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <TaskItem
               key={task.id}
@@ -293,7 +272,7 @@ export function SectionView({
             />
           ))}
         </SortableContext>
-      </DndContext>
+      </div>
       <AddTask onAdd={(title) => onAddTask(title, section?.id ?? null)} />
     </div>
   );

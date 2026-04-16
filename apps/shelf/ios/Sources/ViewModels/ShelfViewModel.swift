@@ -337,6 +337,12 @@ final class ShelfViewModel {
 
     // MARK: - Helpers
 
+    func updateCommentCount(taskId: String, projectId: String, delta: Int) {
+        if let idx = tasks[projectId]?.firstIndex(where: { $0.id == taskId }) {
+            tasks[projectId]?[idx].commentCount += delta
+        }
+    }
+
     private func replaceTask(old: Task, new: Task) {
         if old.projectId != new.projectId {
             tasks[old.projectId]?.removeAll { $0.id == old.id }

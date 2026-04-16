@@ -1,11 +1,16 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -21,12 +26,57 @@ interface ProjectViewProps {
   onClickTask: (task: Task) => void;
 }
 
+function parseDragId(id: string): { type: "section" | "task" | "droppable"; rawId: string } {
+  const s = String(id);
+  if (s.startsWith("section-")) return { type: "section", rawId: s.slice(8) };
+  if (s.startsWith("task-")) return { type: "task", rawId: s.slice(5) };
+  return { type: "droppable", rawId: s };
+}
+
+function sectionIdFromDroppable(droppableId: string): string | null {
+  if (droppableId === "droppable-unsectioned") return null;
+  if (droppableId.startsWith("droppable-section-")) return droppableId.slice(18);
+  return null;
+}
+
+// Custom collision detection: prioritize task items over droppable zones
+const taskAwareCollision: CollisionDetection = (args) => {
+  const activeId = String(args.active.id);
+  const isTaskDrag = activeId.startsWith("task-");
+
+  if (isTaskDrag) {
+    // First try pointerWithin for precise detection among tasks
+    const pointerCollisions = pointerWithin(args);
+    // Filter to only task and droppable collisions (not section sortables)
+    const taskCollisions = pointerCollisions.filter((c) => {
+      const id = String(c.id);
+      return id.startsWith("task-") || id.startsWith("droppable-");
+    });
+    // Prefer task collisions over droppable zones
+    const taskOnly = taskCollisions.filter((c) => String(c.id).startsWith("task-"));
+    if (taskOnly.length > 0) return taskOnly;
+    // Fall back to droppable zones (for empty sections)
+    const droppableOnly = taskCollisions.filter((c) => String(c.id).startsWith("droppable-"));
+    if (droppableOnly.length > 0) return droppableOnly;
+    // Final fallback: rectIntersection for edge cases
+    const rectCollisions = rectIntersection(args);
+    return rectCollisions.filter((c) => {
+      const id = String(c.id);
+      return id.startsWith("task-") || id.startsWith("droppable-");
+    });
+  }
+
+  // Section drag: use closestCenter among section items only
+  return closestCenter(args);
+};
+
 export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [addingSectionName, setAddingSectionName] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
+  const dragTypeRef = useRef<"section" | "task" | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -61,19 +111,6 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const handleReorderTasks = async (items: { id: string; position: number }[]) => {
-    // Optimistic update
-    setTasks((prev) => {
-      const updated = [...prev];
-      for (const item of items) {
-        const idx = updated.findIndex((t) => t.id === item.id);
-        if (idx !== -1) updated[idx] = { ...updated[idx], position: item.position };
-      }
-      return updated.sort((a, b) => a.position - b.position);
-    });
-    await api.patch("/tasks/reorder", { items });
-  };
-
   const handleAddSection = async () => {
     const trimmed = addingSectionName.trim();
     if (!trimmed) return;
@@ -93,23 +130,127 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   const handleDeleteSection = async (id: string) => {
     await api.delete(`/sections/${id}`);
     setSections((prev) => prev.filter((s) => s.id !== id));
-    // Tasks in deleted section become unsectioned
     setTasks((prev) =>
       prev.map((t) => (t.section_id === id ? { ...t, section_id: null } : t))
     );
   };
 
-  const handleSectionDragEnd = (event: DragEndEvent) => {
+  // --- Drag handlers ---
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { type } = parseDragId(String(event.active.id));
+    dragTypeRef.current = type === "section" || type === "task" ? type : null;
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    if (dragTypeRef.current !== "task") return;
     const { active, over } = event;
+    if (!over) return;
+
+    const activeInfo = parseDragId(String(active.id));
+    const overInfo = parseDragId(String(over.id));
+    if (activeInfo.type !== "task") return;
+
+    const activeTask = tasks.find((t) => t.id === activeInfo.rawId);
+    if (!activeTask) return;
+
+    // Determine the target section_id
+    let targetSectionId: string | null | undefined;
+    if (overInfo.type === "task") {
+      const overTask = tasks.find((t) => t.id === overInfo.rawId);
+      if (!overTask) return;
+      targetSectionId = overTask.section_id;
+    } else if (overInfo.type === "droppable") {
+      targetSectionId = sectionIdFromDroppable(overInfo.rawId);
+    } else {
+      return;
+    }
+
+    // Move task to a different section during drag (optimistic visual)
+    if (targetSectionId !== undefined && activeTask.section_id !== targetSectionId) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === activeInfo.rawId ? { ...t, section_id: targetSectionId } : t
+        )
+      );
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    const currentDragType = dragTypeRef.current;
+    dragTypeRef.current = null;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = sections.findIndex((s) => s.id === active.id);
-    const newIndex = sections.findIndex((s) => s.id === over.id);
-    const reordered = arrayMove(sections, oldIndex, newIndex);
-    setSections(reordered);
+    if (currentDragType === "section") {
+      // Section reordering
+      const activeInfo = parseDragId(String(active.id));
+      const overInfo = parseDragId(String(over.id));
+      if (activeInfo.type !== "section" || overInfo.type !== "section") return;
 
-    const items = reordered.map((s, i) => ({ id: s.id, position: i }));
-    api.patch(`/projects/${projectId}/sections/reorder`, { items });
+      const oldIndex = sections.findIndex((s) => s.id === activeInfo.rawId);
+      const newIndex = sections.findIndex((s) => s.id === overInfo.rawId);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(sections, oldIndex, newIndex);
+      setSections(reordered);
+      const items = reordered.map((s, i) => ({ id: s.id, position: i }));
+      api.patch(`/projects/${projectId}/sections/reorder`, { items });
+      return;
+    }
+
+    if (currentDragType === "task") {
+      const activeInfo = parseDragId(String(active.id));
+      const overInfo = parseDragId(String(over.id));
+      if (activeInfo.type !== "task") return;
+
+      const activeTask = tasks.find((t) => t.id === activeInfo.rawId);
+      if (!activeTask) return;
+
+      // Target section was already updated in onDragOver
+      const targetSectionId = activeTask.section_id;
+
+      // Get all tasks in the target section (including active), sorted
+      const allSectionTasks = tasks
+        .filter((t) => t.section_id === targetSectionId)
+        .sort((a, b) => a.position - b.position);
+
+      let reordered: Task[];
+
+      if (overInfo.type === "task") {
+        // Use arrayMove for correct handling of drag direction
+        const oldIndex = allSectionTasks.findIndex((t) => t.id === activeInfo.rawId);
+        const newIndex = allSectionTasks.findIndex((t) => t.id === overInfo.rawId);
+        if (oldIndex === -1 || newIndex === -1) return;
+        reordered = arrayMove(allSectionTasks, oldIndex, newIndex);
+      } else {
+        // Dropped on empty section droppable — move to end
+        const withoutActive = allSectionTasks.filter((t) => t.id !== activeInfo.rawId);
+        reordered = [...withoutActive, activeTask];
+      }
+
+      // Build reorder items with section_id
+      const reorderItems = reordered.map((t, i) => ({
+        id: t.id,
+        position: i,
+        section_id: targetSectionId,
+      }));
+
+      // Optimistic update
+      setTasks((prev) => {
+        const others = prev.filter(
+          (t) => t.section_id !== targetSectionId && t.id !== activeInfo.rawId
+        );
+        const updated = reordered.map((t, i) => ({
+          ...t,
+          position: i,
+          section_id: targetSectionId,
+        }));
+        return [...others, ...updated];
+      });
+
+      api.patch("/tasks/reorder", { items: reorderItems });
+    }
   };
 
   if (loading) {
@@ -120,33 +261,40 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     );
   }
 
-  const unsectionedTasks = tasks.filter((t) => !t.section_id);
+  const unsectionedTasks = tasks
+    .filter((t) => !t.section_id)
+    .sort((a, b) => a.position - b.position);
+  const sectionIds = sections.map((s) => `section-${s.id}`);
 
   return (
     <div style={{ padding: "16px 0" }}>
-      {(unsectionedTasks.length > 0 || sections.length === 0) && (
+      <DndContext
+        sensors={sensors}
+        collisionDetection={taskAwareCollision}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
         <SectionView
           section={null}
           tasks={unsectionedTasks}
           onAddTask={handleAddTask}
           onDeleteTask={handleDeleteTask}
           onClickTask={onClickTask}
-          onReorderTasks={handleReorderTasks}
         />
-      )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-        <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
           {sections.map((section) => (
             <SectionView
               key={section.id}
-              sortableId={section.id}
+              sortableId={`section-${section.id}`}
               section={section}
-              tasks={tasks.filter((t) => t.section_id === section.id)}
+              tasks={tasks
+                .filter((t) => t.section_id === section.id)
+                .sort((a, b) => a.position - b.position)}
               onAddTask={handleAddTask}
               onDeleteTask={handleDeleteTask}
               onClickTask={onClickTask}
-              onReorderTasks={handleReorderTasks}
               onRenameSection={handleRenameSection}
               onDeleteSection={handleDeleteSection}
             />
