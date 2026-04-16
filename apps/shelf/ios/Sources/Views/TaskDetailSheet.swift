@@ -7,7 +7,7 @@ struct TaskDetailSheet: View {
     let onDismiss: () -> Void
 
     @State private var editingTitle: String = ""
-    @State private var isEditingTitle = false
+    @FocusState private var isTitleFocused: Bool
     @State private var showDatePicker = false
     @State private var selectedDate = Date()
     @State private var showMoveSheet = false
@@ -111,36 +111,33 @@ struct TaskDetailSheet: View {
 
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if isEditingTitle {
-                TextField("タイトル", text: $editingTitle)
-                    .font(.title3)
-                    .foregroundStyle(Theme.textPrimary)
-                    .textFieldStyle(.plain)
-                    .onSubmit {
-                        let title = editingTitle.trimmingCharacters(in: .whitespaces)
-                        if !title.isEmpty && title != task.title {
-                            Swift.Task {
-                                await viewModel.updateTask(task, title: title)
-                                task.title = title
-                            }
-                        }
-                        isEditingTitle = false
-                    }
-            } else {
-                Text(task.title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.textPrimary)
-                    .onTapGesture {
-                        editingTitle = task.title
-                        isEditingTitle = true
-                    }
-            }
+            TextField("タイトル", text: $editingTitle)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.textPrimary)
+                .textFieldStyle(.plain)
+                .focused($isTitleFocused)
+                .onSubmit { saveTitleIfChanged() }
+                .onChange(of: isTitleFocused) {
+                    if !isTitleFocused { saveTitleIfChanged() }
+                }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.bgSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear { editingTitle = task.title }
+    }
+
+    private func saveTitleIfChanged() {
+        let title = editingTitle.trimmingCharacters(in: .whitespaces)
+        if !title.isEmpty && title != task.title {
+            let newTitle = title
+            Swift.Task {
+                await viewModel.updateTask(task, title: newTitle)
+                task.title = newTitle
+            }
+        }
     }
 
     // MARK: - Due Date
