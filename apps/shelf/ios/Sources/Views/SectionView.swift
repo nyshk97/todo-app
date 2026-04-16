@@ -94,6 +94,7 @@ struct TaskListView: View {
     @State private var isAdding = false
     @State private var draggingTaskId: String?
     @State private var confirmDeleteTask: Task?
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,6 +123,7 @@ struct TaskListView: View {
                     TextField("タスク名", text: $newTaskTitle)
                         .textFieldStyle(.plain)
                         .foregroundStyle(Theme.textPrimary)
+                        .focused($isTextFieldFocused)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .onSubmit {
@@ -142,6 +144,7 @@ struct TaskListView: View {
             } else {
                 Button {
                     isAdding = true
+                    isTextFieldFocused = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
