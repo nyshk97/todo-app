@@ -42,6 +42,17 @@ struct Task: Codable, Identifiable, Equatable {
     let createdAt: String
     let updatedAt: String
 
+    init(
+        id: String, projectId: String, sectionId: String?, title: String,
+        dueDate: String?, position: Int, commentCount: Int, archivedAt: String?,
+        createdAt: String, updatedAt: String
+    ) {
+        self.id = id; self.projectId = projectId; self.sectionId = sectionId
+        self.title = title; self.dueDate = dueDate; self.position = position
+        self.commentCount = commentCount; self.archivedAt = archivedAt
+        self.createdAt = createdAt; self.updatedAt = updatedAt
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)

@@ -13,6 +13,7 @@ import { TabNav } from "./components/TabNav";
 import { ProjectView } from "./components/ProjectView";
 import { TaskDetail } from "./components/TaskDetail";
 import { ArchiveView } from "./components/ArchiveView";
+import { ToastProvider, useToast } from "./components/Toast";
 
 function Shell() {
   const { projectId } = useParams();
@@ -24,6 +25,7 @@ function Shell() {
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { showToast } = useToast();
 
   const isArchive = location.pathname === "/archive";
 
@@ -64,9 +66,14 @@ function Shell() {
   };
 
   const handleTaskDelete = async (id: string) => {
-    await api.delete(`/tasks/${id}`);
     setSelectedTask(null);
     setRefreshKey((k) => k + 1);
+    try {
+      await api.delete(`/tasks/${id}`);
+    } catch {
+      setRefreshKey((k) => k + 1);
+      showToast("タスクの削除に失敗しました", () => handleTaskDelete(id));
+    }
   };
 
   const handleMoveToToday = async (id: string) => {
@@ -171,12 +178,14 @@ function Shell() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/projects/:projectId" element={<Shell />} />
-        <Route path="/archive" element={<Shell />} />
-        <Route path="*" element={<Shell />} />
-      </Routes>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/projects/:projectId" element={<Shell />} />
+          <Route path="/archive" element={<Shell />} />
+          <Route path="*" element={<Shell />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }

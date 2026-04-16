@@ -3,6 +3,7 @@ import type { Task, Comment, Project, Section, Attachment } from "@todo-shelf/sh
 import { api } from "../lib/api";
 import { getDueDateStatus } from "../lib/date";
 import { AutoLink } from "./AutoLink";
+import { useToast } from "./Toast";
 
 interface TaskDetailProps {
   task: Task;
@@ -51,6 +52,7 @@ export function TaskDetail({
   const [showMoveUI, setShowMoveUI] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     api.get<Comment[]>(`/tasks/${task.id}/comments`).then(setComments);
@@ -59,17 +61,36 @@ export function TaskDetail({
   const handleTitleBlur = async () => {
     const trimmed = title.trim();
     if (trimmed && trimmed !== task.title) {
-      const updated = await api.patch<Task>(`/tasks/${task.id}`, { title: trimmed });
-      onUpdate(updated);
+      const prevTitle = task.title;
+      onUpdate({ ...task, title: trimmed });
+      try {
+        const updated = await api.patch<Task>(`/tasks/${task.id}`, { title: trimmed });
+        onUpdate(updated);
+      } catch {
+        setTitle(prevTitle);
+        onUpdate({ ...task, title: prevTitle });
+        showToast("タイトルの更新に失敗しました", () => {
+          setTitle(trimmed);
+          handleTitleBlur();
+        });
+      }
     }
   };
 
   const handleDueDateChange = async (value: string) => {
+    const prevDueDate = dueDate;
     setDueDate(value);
-    const updated = await api.patch<Task>(`/tasks/${task.id}`, {
-      due_date: value || null,
-    });
-    onUpdate(updated);
+    onUpdate({ ...task, due_date: value || null });
+    try {
+      const updated = await api.patch<Task>(`/tasks/${task.id}`, {
+        due_date: value || null,
+      });
+      onUpdate(updated);
+    } catch {
+      setDueDate(prevDueDate);
+      onUpdate({ ...task, due_date: prevDueDate || null });
+      showToast("期日の更新に失敗しました", () => handleDueDateChange(value));
+    }
   };
 
   const handleAddComment = async () => {

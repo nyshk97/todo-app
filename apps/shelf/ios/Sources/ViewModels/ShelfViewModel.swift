@@ -1,5 +1,11 @@
 import Foundation
 
+struct ToastItem: Identifiable {
+    let id = UUID()
+    let message: String
+    let retry: (() async -> Void)?
+}
+
 @Observable
 @MainActor
 final class ShelfViewModel {
@@ -9,8 +15,18 @@ final class ShelfViewModel {
     var upcomingCount: Int = 0
     var isLoading = false
     var errorMessage: String?
+    var toasts: [ToastItem] = []
 
     private let api = APIClient.shared
+
+    func showToast(_ message: String, retry: (() async -> Void)? = nil) {
+        let item = ToastItem(message: message, retry: retry)
+        toasts.append(item)
+    }
+
+    func dismissToast(_ id: UUID) {
+        toasts.removeAll { $0.id == id }
+    }
 
     // MARK: - Initial Load
 
@@ -145,15 +161,35 @@ final class ShelfViewModel {
     }
 
     func createTask(title: String, projectId: String, sectionId: String? = nil) async {
+        let tempId = "temp-\(UUID().uuidString)"
+        let now = ISO8601DateFormatter().string(from: Date())
+        let sectionTasks = (tasks[projectId] ?? []).filter { $0.sectionId == sectionId }
+        let optimistic = Task(
+            id: tempId, projectId: projectId, sectionId: sectionId,
+            title: title, dueDate: nil, position: sectionTasks.count,
+            commentCount: 0, archivedAt: nil, createdAt: now, updatedAt: now
+        )
+        tasks[projectId, default: []].append(optimistic)
         do {
             let task = try await api.createTask(title: title, projectId: projectId, sectionId: sectionId)
-            tasks[projectId, default: []].append(task)
+            if let idx = tasks[projectId]?.firstIndex(where: { $0.id == tempId }) {
+                tasks[projectId]?[idx] = task
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            tasks[projectId]?.removeAll { $0.id == tempId }
+            showToast("タスクの作成に失敗しました") { [weak self] in
+                await self?.createTask(title: title, projectId: projectId, sectionId: sectionId)
+            }
         }
     }
 
     func updateTask(_ task: Task, title: String? = nil, dueDate: String?? = nil, projectId: String? = nil, sectionId: String?? = nil) async {
+        // Optimistic update
+        var optimistic = task
+        if let t = title { optimistic.title = t }
+        if let d = dueDate { optimistic.dueDate = d }
+        replaceTask(old: task, new: optimistic)
+
         do {
             let updated = try await api.updateTask(
                 id: task.id,
@@ -162,18 +198,25 @@ final class ShelfViewModel {
                 sectionId: sectionId,
                 dueDate: dueDate
             )
-            replaceTask(old: task, new: updated)
+            replaceTask(old: optimistic, new: updated)
         } catch {
-            errorMessage = error.localizedDescription
+            replaceTask(old: optimistic, new: task)
+            showToast("タスクの更新に失敗しました") { [weak self] in
+                await self?.updateTask(task, title: title, dueDate: dueDate, projectId: projectId, sectionId: sectionId)
+            }
         }
     }
 
     func deleteTask(_ task: Task) async {
+        let snapshot = tasks[task.projectId] ?? []
+        tasks[task.projectId]?.removeAll { $0.id == task.id }
         do {
             try await api.deleteTask(id: task.id)
-            tasks[task.projectId]?.removeAll { $0.id == task.id }
         } catch {
-            errorMessage = error.localizedDescription
+            tasks[task.projectId] = snapshot
+            showToast("タスクの削除に失敗しました") { [weak self] in
+                await self?.deleteTask(task)
+            }
         }
     }
 

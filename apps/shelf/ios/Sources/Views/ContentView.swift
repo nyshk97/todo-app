@@ -35,6 +35,7 @@ struct ContentView: View {
             }
         }
         .background(Theme.bgPage)
+        .overlay { ToastOverlay(viewModel: viewModel) }
         .alert("エラー", isPresented: showErrorBinding) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {

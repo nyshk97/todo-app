@@ -20,6 +20,7 @@ import {
 import type { Section, Task } from "@todo-shelf/shared";
 import { api } from "../lib/api";
 import { SectionView } from "./SectionView";
+import { useToast } from "./Toast";
 
 interface ProjectViewProps {
   projectId: string;
@@ -77,6 +78,7 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   const [addingSectionName, setAddingSectionName] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
   const dragTypeRef = useRef<"section" | "task" | null>(null);
+  const { showToast } = useToast();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -98,17 +100,44 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   }, [load]);
 
   const handleAddTask = async (title: string, sectionId: string | null) => {
-    const task = await api.post<Task>("/tasks", {
-      title,
+    const tempId = `temp-${Date.now()}`;
+    const now = new Date().toISOString();
+    const sectionTasks = tasks.filter((t) => t.section_id === sectionId);
+    const optimistic: Task = {
+      id: tempId,
       project_id: projectId,
       section_id: sectionId,
-    });
-    setTasks((prev) => [...prev, task]);
+      title,
+      due_date: null,
+      position: sectionTasks.length,
+      comment_count: 0,
+      archived_at: null,
+      created_at: now,
+      updated_at: now,
+    };
+    setTasks((prev) => [...prev, optimistic]);
+    try {
+      const task = await api.post<Task>("/tasks", {
+        title,
+        project_id: projectId,
+        section_id: sectionId,
+      });
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? task : t)));
+    } catch {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      showToast("タスクの作成に失敗しました", () => handleAddTask(title, sectionId));
+    }
   };
 
   const handleDeleteTask = async (id: string) => {
-    await api.delete(`/tasks/${id}`);
+    const snapshot = tasks;
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await api.delete(`/tasks/${id}`);
+    } catch {
+      setTasks(snapshot);
+      showToast("タスクの削除に失敗しました", () => handleDeleteTask(id));
+    }
   };
 
   const handleAddSection = async () => {
