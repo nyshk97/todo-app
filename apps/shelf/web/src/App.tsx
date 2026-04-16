@@ -31,7 +31,7 @@ function Shell() {
   const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [allSections, setAllSections] = useState<Section[]>([]);
-  const [vaultUpcomingCount, setVaultUpcomingCount] = useState(0);
+  const [backlogUpcomingCount, setBacklogUpcomingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -47,11 +47,11 @@ function Shell() {
       ]);
       setProjects(ps);
 
-      // Count upcoming tasks in Vault project only
-      const vaultProject = ps.find((p) => p.name === "Vault");
-      if (vaultProject) {
-        setVaultUpcomingCount(
-          upcoming.filter((t) => t.project_id === vaultProject.id).length
+      // Count upcoming tasks in Backlog project only
+      const backlogProject = ps.find((p) => p.name === "Backlog");
+      if (backlogProject) {
+        setBacklogUpcomingCount(
+          upcoming.filter((t) => t.project_id === backlogProject.id).length
         );
       }
 
@@ -198,7 +198,7 @@ function Shell() {
       {showFab && (
         <Fab
           projects={projects}
-          vaultUpcomingCount={vaultUpcomingCount}
+          backlogUpcomingCount={backlogUpcomingCount}
           onNavigate={handleNavigate}
           onProjectsChange={setProjects}
         />

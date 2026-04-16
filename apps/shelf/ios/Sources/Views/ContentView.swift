@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppDestination: Hashable {
-    case vault(String)   // project id
+    case backlog(String)   // project id
     case archive
 }
 
@@ -17,10 +17,10 @@ struct ContentView: View {
                         .overlay(alignment: .bottomTrailing) {
                             FabButton(
                                 viewModel: viewModel,
-                                vaultUpcomingCount: vaultUpcomingCount,
-                                onNavigateVault: {
-                                    if let vault = vaultProject {
-                                        path.append(AppDestination.vault(vault.id))
+                                backlogUpcomingCount: backlogUpcomingCount,
+                                onNavigateBacklog: {
+                                    if let backlog = backlogProject {
+                                        path.append(AppDestination.backlog(backlog.id))
                                     }
                                 },
                                 onNavigateArchive: {
@@ -43,9 +43,9 @@ struct ContentView: View {
             .background(Theme.bgPage)
             .navigationDestination(for: AppDestination.self) { dest in
                 switch dest {
-                case .vault(let projectId):
+                case .backlog(let projectId):
                     ProjectView(viewModel: viewModel, projectId: projectId)
-                        .navigationTitle("Vault")
+                        .navigationTitle("Backlog")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbarBackground(Theme.bgPanel, for: .navigationBar)
                         .toolbarBackground(.visible, for: .navigationBar)
@@ -76,16 +76,16 @@ struct ContentView: View {
             ?? viewModel.projects.first
     }
 
-    private var vaultProject: Project? {
-        viewModel.projects.first(where: { $0.name == "Vault" })
+    private var backlogProject: Project? {
+        viewModel.projects.first(where: { $0.name == "Backlog" })
     }
 
-    private var vaultUpcomingCount: Int {
-        guard let vault = vaultProject else { return 0 }
-        let vaultTasks = viewModel.tasks[vault.id] ?? []
+    private var backlogUpcomingCount: Int {
+        guard let backlog = backlogProject else { return 0 }
+        let backlogTasks = viewModel.tasks[backlog.id] ?? []
         let now = Date()
         let jst = TimeZone(identifier: "Asia/Tokyo")!
-        return vaultTasks.filter { task in
+        return backlogTasks.filter { task in
             guard let dueDateStr = task.dueDate,
                   let dueDate = DateHelper.parseDate(dueDateStr) else { return false }
             var cal = Calendar.current
@@ -107,19 +107,19 @@ struct ContentView: View {
 
 struct FabButton: View {
     let viewModel: ShelfViewModel
-    let vaultUpcomingCount: Int
-    let onNavigateVault: () -> Void
+    let backlogUpcomingCount: Int
+    let onNavigateBacklog: () -> Void
     let onNavigateArchive: () -> Void
 
     @State private var showMenu = false
 
     var body: some View {
         Menu {
-            if viewModel.projects.contains(where: { $0.name == "Vault" }) {
+            if viewModel.projects.contains(where: { $0.name == "Backlog" }) {
                 Button {
-                    onNavigateVault()
+                    onNavigateBacklog()
                 } label: {
-                    Label("Vault", systemImage: "lock.shield")
+                    Label("Backlog", systemImage: "tray.full")
                 }
             }
 
@@ -140,8 +140,8 @@ struct FabButton: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
 
-                if vaultUpcomingCount > 0 {
-                    Text("\(vaultUpcomingCount)")
+                if backlogUpcomingCount > 0 {
+                    Text("\(backlogUpcomingCount)")
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundStyle(.black)

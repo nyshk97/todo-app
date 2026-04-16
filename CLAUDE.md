@@ -46,6 +46,11 @@
 - API URL・シークレットは `apps/ios/Sources/Secrets.swift` と `APIClient.swift` にハードコード
 - `DEVELOPMENT_TEAM` は project.yml でプレースホルダー（Xcode で初回ビルド時に自動設定される）
 
+## プロジェクト名のハードコード
+
+- コード内で `p.name === "Shelf"`, `"Backlog"`, `"Archive"` などプロジェクト名の完全一致で表示制御している箇所がある（Web: App.tsx, Fab.tsx / iOS: ContentView.swift）
+- プロジェクト名を変更する場合、コード変更 → デプロイ → DB リネームの順で行うか、同時に反映すること
+
 ## dnd-kit
 
 - 複数コンテナ間 D&D では `closestCenter` ではなくカスタム collision detection を使い、タスク要素を droppable ゾーンより優先する

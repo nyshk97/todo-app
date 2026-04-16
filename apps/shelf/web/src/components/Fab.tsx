@@ -4,19 +4,19 @@ import { api } from "../lib/api";
 
 interface FabProps {
   projects: Project[];
-  vaultUpcomingCount: number;
+  backlogUpcomingCount: number;
   onNavigate: (path: string) => void;
   onProjectsChange: (projects: Project[]) => void;
 }
 
-export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange }: FabProps) {
+export function Fab({ projects, backlogUpcomingCount, onNavigate, onProjectsChange }: FabProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [addingName, setAddingName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
-  const vaultProject = projects.find((p) => p.name === "Vault");
+  const backlogProject = projects.find((p) => p.name === "Backlog");
   const archivePath = "/archive";
 
   const handleAdd = async () => {
@@ -72,7 +72,7 @@ export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange
         onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg-elevated)")}
       >
         •••
-        {vaultUpcomingCount > 0 && (
+        {backlogUpcomingCount > 0 && (
           <span style={{
             position: "absolute",
             top: -2,
@@ -89,7 +89,7 @@ export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange
             justifyContent: "center",
             padding: "0 4px",
           }}>
-            {vaultUpcomingCount}
+            {backlogUpcomingCount}
           </span>
         )}
       </button>
@@ -116,11 +116,11 @@ export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange
           zIndex: 101,
           boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
         }}>
-          {/* Vault */}
-          {vaultProject && (
+          {/* Backlog */}
+          {backlogProject && (
             <button
               onClick={() => {
-                onNavigate(`/projects/${vaultProject.id}`);
+                onNavigate(`/projects/${backlogProject.id}`);
                 setShowMenu(false);
               }}
               style={{
@@ -142,8 +142,8 @@ export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              Vault
-              {vaultUpcomingCount > 0 && (
+              Backlog
+              {backlogUpcomingCount > 0 && (
                 <span style={{
                   marginLeft: "auto",
                   minWidth: 18,
@@ -158,7 +158,7 @@ export function Fab({ projects, vaultUpcomingCount, onNavigate, onProjectsChange
                   justifyContent: "center",
                   padding: "0 4px",
                 }}>
-                  {vaultUpcomingCount}
+                  {backlogUpcomingCount}
                 </span>
               )}
             </button>
