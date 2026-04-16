@@ -14,7 +14,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todomac
-        MARKETING_VERSION: "1.13.0"
+        MARKETING_VERSION: "1.14.0"
         CURRENT_PROJECT_VERSION: 1
         SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER
