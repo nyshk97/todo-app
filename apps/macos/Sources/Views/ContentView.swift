@@ -57,6 +57,7 @@ struct ContentView: View {
                     Text(viewModel.dateLabel)
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(colors.textPrimary)
+                        .allowsHitTesting(false)
                     if viewModel.isToday {
                         Button {
                             refreshTodos()
@@ -79,6 +80,7 @@ struct ContentView: View {
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
+                    .allowsHitTesting(false)
             }
 
             HStack {
