@@ -7,6 +7,7 @@ struct ProjectView: View {
     @State private var selectedTask: Task?
     @State private var showAddSection = false
     @State private var newSectionName = ""
+    @State private var showReorderSections = false
 
     var body: some View {
         let sections = viewModel.sectionsFor(projectId: projectId)
@@ -50,7 +51,8 @@ struct ProjectView: View {
                         viewModel: viewModel,
                         section: section,
                         projectId: projectId,
-                        onSelectTask: { selectedTask = $0 }
+                        onSelectTask: { selectedTask = $0 },
+                        onReorderSections: { showReorderSections = true }
                     )
                 }
 
@@ -101,6 +103,9 @@ struct ProjectView: View {
         .background(Theme.bgPage)
         .sheet(item: $selectedTask) { task in
             TaskDetailSheet(viewModel: viewModel, task: task, onDismiss: { selectedTask = nil })
+        }
+        .sheet(isPresented: $showReorderSections) {
+            SectionReorderSheet(viewModel: viewModel, projectId: projectId)
         }
     }
 

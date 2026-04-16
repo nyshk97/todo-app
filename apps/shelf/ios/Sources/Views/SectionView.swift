@@ -6,6 +6,7 @@ struct SectionView: View {
     let section: Section
     let projectId: String
     let onSelectTask: (Task) -> Void
+    var onReorderSections: (() -> Void)?
 
     @State private var showRenameAlert = false
     @State private var showDeleteAlert = false
@@ -42,6 +43,11 @@ struct SectionView: View {
                     showRenameAlert = true
                 } label: {
                     Label("名前を変更", systemImage: "pencil")
+                }
+                Button {
+                    onReorderSections?()
+                } label: {
+                    Label("セクションを並び替え", systemImage: "arrow.up.arrow.down")
                 }
                 Button(role: .destructive) {
                     showDeleteAlert = true
