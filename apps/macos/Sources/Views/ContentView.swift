@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var editingTodoId: String?
     @State private var editingTitle: String = ""
     @State private var draggingTodoId: String?
+    @State private var isRefreshing: Bool = false
     @FocusState private var isInputFocused: Bool
 
     private var colors: AppColors { Theme.current }
@@ -38,19 +39,47 @@ struct ContentView: View {
         }
     }
 
+    private func refreshTodos() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        Task {
+            await viewModel.loadTodos()
+            withAnimation { isRefreshing = false }
+        }
+    }
+
     // MARK: - Header
 
     private var headerView: some View {
         ZStack {
             VStack(spacing: 4) {
-                Text(viewModel.dateLabel)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(colors.textPrimary)
+                HStack(spacing: 8) {
+                    Text(viewModel.dateLabel)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(colors.textPrimary)
+                    if viewModel.isToday {
+                        Button {
+                            refreshTodos()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(colors.textSecondary)
+                                .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                                .animation(
+                                    isRefreshing
+                                        ? .linear(duration: 0.6).repeatForever(autoreverses: false)
+                                        : .default,
+                                    value: isRefreshing
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .keyboardShortcut("r", modifiers: .command)
+                    }
+                }
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
             }
-            .frame(maxWidth: .infinity)
 
             HStack {
                 Button {
