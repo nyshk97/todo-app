@@ -118,6 +118,19 @@ export function TaskDetail({
     e.target.value = "";
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+    const renamed = imageFiles.map((f) => {
+      const ext = f.name.split(".").pop() || "png";
+      return new File([f], `pasted-${ts}.${ext}`, { type: f.type });
+    });
+    setPendingFiles((prev) => [...prev, ...renamed].slice(0, 5));
+  };
+
   const removePendingFile = (index: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -614,6 +627,7 @@ export function TaskDetail({
                     e.target.style.height = "auto";
                     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                   }}
+                  onPaste={handlePaste}
                   onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleAddComment(); } }}
                   placeholder="コメントを追加...（⌘+Enter で送信）"
                   rows={1}
