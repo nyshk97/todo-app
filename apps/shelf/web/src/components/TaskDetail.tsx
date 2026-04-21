@@ -51,8 +51,21 @@ export function TaskDetail({
   const [editingCommentText, setEditingCommentText] = useState("");
   const [showMoveUI, setShowMoveUI] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!previewImage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setPreviewImage(null);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [previewImage]);
 
   useEffect(() => {
     api.get<Comment[]>(`/tasks/${task.id}/comments`).then(setComments);
@@ -175,6 +188,7 @@ export function TaskDetail({
   const status = getDueDateStatus(task.due_date);
 
   return (
+    <>
     <div
       style={{
         position: "fixed",
@@ -494,18 +508,19 @@ export function TaskDetail({
                       {c.attachments.map((a: Attachment) => (
                         <div key={a.id} style={{ position: "relative" }}>
                           {isImageType(a.content_type) ? (
-                            <a href={api.attachmentUrl(a.id)} target="_blank" rel="noopener noreferrer">
-                              <img
-                                src={api.attachmentUrl(a.id)}
-                                alt={a.filename}
-                                style={{
-                                  maxWidth: "100%",
-                                  maxHeight: 300,
-                                  borderRadius: "var(--radius-sm)",
-                                  border: "1px solid var(--border-subtle)",
-                                }}
-                              />
-                            </a>
+                            <img
+                              src={api.attachmentUrl(a.id)}
+                              alt={a.filename}
+                              onClick={() => setPreviewImage({ url: api.attachmentUrl(a.id), alt: a.filename })}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: 300,
+                                borderRadius: "var(--radius-sm)",
+                                border: "1px solid var(--border-subtle)",
+                                cursor: "zoom-in",
+                                display: "block",
+                              }}
+                            />
                           ) : (
                             <a
                               href={api.attachmentUrl(a.id)}
@@ -667,5 +682,64 @@ export function TaskDetail({
         </div>
       </div>
     </div>
+
+      {previewImage && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewImage(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 200,
+            cursor: "zoom-out",
+            padding: 24,
+          }}
+        >
+          <img
+            src={previewImage.url}
+            alt={previewImage.alt}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+              borderRadius: "var(--radius-sm)",
+              cursor: "default",
+            }}
+          />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewImage(null);
+            }}
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              border: "none",
+              background: "rgba(0,0,0,0.6)",
+              color: "var(--text-secondary)",
+              fontSize: 16,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </>
   );
 }
