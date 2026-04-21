@@ -67,8 +67,13 @@ const taskAwareCollision: CollisionDetection = (args) => {
     });
   }
 
-  // Section drag: use closestCenter among section items only
-  return closestCenter(args);
+  // Section drag: only consider other section sortables
+  return closestCenter({
+    ...args,
+    droppableContainers: args.droppableContainers.filter((c) =>
+      String(c.id).startsWith("section-")
+    ),
+  });
 };
 
 export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
