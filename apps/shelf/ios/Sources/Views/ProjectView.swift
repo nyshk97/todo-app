@@ -98,6 +98,9 @@ struct ProjectView: View {
             }
             .padding(.bottom, 80)
             .coordinateSpace(name: "project")
+            .background(ScrollViewFinder { scrollView in
+                dragController.scrollView = scrollView
+            })
             .onPreferenceChange(SectionFramesPreferenceKey.self) { value in
                 dragController.sectionFrames = value
             }

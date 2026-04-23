@@ -121,6 +121,11 @@ struct TaskListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if tasks.isEmpty && isDropTarget {
+                Rectangle()
+                    .fill(Theme.accentBright)
+                    .frame(height: 2)
+            }
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
