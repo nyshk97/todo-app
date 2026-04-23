@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SectionView: View {
     let viewModel: ShelfViewModel
@@ -84,6 +83,14 @@ struct SectionView: View {
             )
         }
         .padding(.top, 8)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: SectionFramesPreferenceKey.self,
+                    value: [SectionFrameKey(sectionId: section.id): geo.frame(in: .named("project"))]
+                )
+            }
+        )
     }
 }
 
@@ -96,31 +103,56 @@ struct TaskListView: View {
     let sectionId: String?
     let onSelect: (Task) -> Void
 
+    @Environment(DragController.self) private var dragController
+
     @State private var newTaskTitle = ""
     @State private var isAdding = false
-    @State private var draggingTaskId: String?
-    @State private var confirmDeleteTask: Task?
     @FocusState private var isTextFieldFocused: Bool
+
+    private var isDropTarget: Bool {
+        dragController.isActive && dragController.currentDropTarget?.sectionId == sectionId
+    }
+
+    private func showsInsertionIndicator(at index: Int) -> Bool {
+        guard isDropTarget,
+              let target = dragController.currentDropTarget else { return false }
+        return target.insertionIndex == index
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(tasks) { task in
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
-                    onTap: { onSelect(task) },
-                    onDelete: { confirmDeleteTask = task }
+                    onTap: { onSelect(task) }
                 )
-                .onDrag {
-                    draggingTaskId = task.id
-                    return NSItemProvider(object: task.id as NSString)
+                .opacity(dragController.draggingTaskId == task.id ? 0.3 : 1.0)
+                .overlay(alignment: .top) {
+                    if showsInsertionIndicator(at: index) {
+                        Rectangle()
+                            .fill(Theme.accentBright)
+                            .frame(height: 2)
+                    }
                 }
-                .onDrop(of: [UTType.text], delegate: TaskDropDelegate(
-                    taskId: task.id,
-                    viewModel: viewModel,
-                    projectId: projectId,
-                    sectionId: sectionId,
-                    draggingTaskId: $draggingTaskId
-                ))
+                .overlay(alignment: .bottom) {
+                    if index == tasks.count - 1 && showsInsertionIndicator(at: tasks.count) {
+                        Rectangle()
+                            .fill(Theme.accentBright)
+                            .frame(height: 2)
+                    }
+                }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: TaskFramesPreferenceKey.self,
+                            value: [task.id: TaskFrameInfo(
+                                sectionId: sectionId,
+                                frame: geo.frame(in: .named("project"))
+                            )]
+                        )
+                    }
+                )
+                .simultaneousGesture(dragGesture(for: task))
             }
 
             // Add task
@@ -164,19 +196,96 @@ struct TaskListView: View {
                 }
             }
         }
-        .alert("タスクを削除しますか？", isPresented: Binding(
-            get: { confirmDeleteTask != nil },
-            set: { if !$0 { confirmDeleteTask = nil } }
-        )) {
-            Button("削除", role: .destructive) {
-                if let task = confirmDeleteTask {
-                    Swift.Task { await viewModel.deleteTask(task) }
+        .background(isDropTarget ? Theme.accentBright.opacity(0.08) : Color.clear)
+        .background(unsectionedFrameReporter)
+    }
+
+    @ViewBuilder
+    private var unsectionedFrameReporter: some View {
+        if sectionId == nil {
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: SectionFramesPreferenceKey.self,
+                    value: [SectionFrameKey(sectionId: nil): geo.frame(in: .named("project"))]
+                )
+            }
+        } else {
+            Color.clear
+        }
+    }
+
+    private func dragGesture(for task: Task) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.4)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("project")))
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    break
+                case .second(true, let dragValue):
+                    guard let dragValue else { return }
+                    if !dragController.isActive {
+                        guard let frame = dragController.taskFrames[task.id]?.frame else { return }
+                        let touchOffset = CGSize(
+                            width: dragValue.startLocation.x - frame.minX,
+                            height: dragValue.startLocation.y - frame.minY
+                        )
+                        dragController.startDrag(
+                            taskId: task.id,
+                            projectId: projectId,
+                            sourceSectionId: sectionId,
+                            touchOffset: touchOffset,
+                            ghostSize: frame.size,
+                            initialLocation: dragValue.location
+                        )
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } else {
+                        dragController.updateLocation(dragValue.location)
+                    }
+                default:
+                    break
                 }
             }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            if let task = confirmDeleteTask {
-                Text("「\(task.title)」を削除します")
+            .onEnded { _ in
+                let result = dragController.endDrag()
+                guard let result else { return }
+                applyDrop(result: result)
+            }
+    }
+
+    private func applyDrop(result: DragController.DropResult) {
+        let target = result.target
+
+        if target.sectionId == result.sourceSectionId {
+            // Same section — reorder
+            let sectionTasks = viewModel.tasksFor(projectId: projectId, sectionId: target.sectionId)
+            var taskIds = sectionTasks.map(\.id)
+            guard let currentIndex = taskIds.firstIndex(of: result.taskId) else { return }
+
+            taskIds.remove(at: currentIndex)
+            var insertionIndex = target.insertionIndex
+            if currentIndex < insertionIndex {
+                insertionIndex -= 1
+            }
+            insertionIndex = max(0, min(insertionIndex, taskIds.count))
+            taskIds.insert(result.taskId, at: insertionIndex)
+
+            let originalIds = sectionTasks.map(\.id)
+            guard taskIds != originalIds else { return }
+
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Swift.Task {
+                await viewModel.reorderTasks(projectId: projectId, sectionId: target.sectionId, taskIds: taskIds)
+            }
+        } else {
+            // Cross-section move
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Swift.Task {
+                await viewModel.moveTaskToSection(
+                    taskId: result.taskId,
+                    projectId: projectId,
+                    toSectionId: target.sectionId,
+                    insertAt: target.insertionIndex
+                )
             }
         }
     }
@@ -192,42 +301,3 @@ struct TaskListView: View {
     }
 }
 
-// MARK: - Drop Delegate
-
-struct TaskDropDelegate: DropDelegate {
-    let taskId: String
-    let viewModel: ShelfViewModel
-    let projectId: String
-    let sectionId: String?
-    @Binding var draggingTaskId: String?
-
-    func performDrop(info: DropInfo) -> Bool {
-        guard let draggingId = draggingTaskId else { return false }
-        let tasks = viewModel.tasksFor(projectId: projectId, sectionId: sectionId)
-        let taskIds = tasks.map(\.id)
-        Swift.Task {
-            await viewModel.reorderTasks(projectId: projectId, sectionId: sectionId, taskIds: taskIds)
-        }
-        draggingTaskId = nil
-        return true
-    }
-
-    func dropEntered(info: DropInfo) {
-        guard let draggingId = draggingTaskId, draggingId != taskId else { return }
-        let tasks = viewModel.tasksFor(projectId: projectId, sectionId: sectionId)
-        guard let fromIndex = tasks.firstIndex(where: { $0.id == draggingId }),
-              let toIndex = tasks.firstIndex(where: { $0.id == taskId }) else { return }
-
-        withAnimation(.default) {
-            viewModel.moveTaskLocally(projectId: projectId, fromIndex: fromIndex, toIndex: toIndex, sectionId: sectionId)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func validateDrop(info: DropInfo) -> Bool {
-        true
-    }
-}

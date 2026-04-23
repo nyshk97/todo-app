@@ -1,10 +1,8 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct TaskRow: View {
     let task: Task
     let onTap: () -> Void
-    let onDelete: () -> Void
 
     private var rowBackground: Color {
         guard let dueDate = task.dueDate else { return .clear }
@@ -16,49 +14,42 @@ struct TaskRow: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 8) {
-                Text(task.title)
-                    .font(.body)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+        HStack(spacing: 8) {
+            Text(task.title)
+                .font(.body)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
 
-                Spacer()
+            Spacer()
 
-                // Comment badge
-                if task.commentCount > 0 {
-                    HStack(spacing: 2) {
-                        Image(systemName: "bubble.right")
-                            .font(.caption2)
-                        Text("\(task.commentCount)")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(Theme.textQuaternary)
+            // Comment badge
+            if task.commentCount > 0 {
+                HStack(spacing: 2) {
+                    Image(systemName: "bubble.right")
+                        .font(.caption2)
+                    Text("\(task.commentCount)")
+                        .font(.caption2)
                 }
-
-                // Due date badge
-                if let dueDate = task.dueDate {
-                    DueDateBadge(dateString: dueDate)
-                }
+                .foregroundStyle(Theme.textQuaternary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(rowBackground)
-            .contentShape(Rectangle())
+
+            // Due date badge
+            if let dueDate = task.dueDate {
+                DueDateBadge(dateString: dueDate)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(rowBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Theme.borderSubtle)
                 .frame(height: 1)
-        }
-        .contextMenu {
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                Label("削除", systemImage: "trash")
-            }
         }
     }
 }

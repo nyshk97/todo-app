@@ -8,6 +8,7 @@ struct ProjectView: View {
     @State private var showAddSection = false
     @State private var newSectionName = ""
     @State private var showReorderSections = false
+    @State private var dragController = DragController()
 
     var body: some View {
         let sections = viewModel.sectionsFor(projectId: projectId)
@@ -96,11 +97,32 @@ struct ProjectView: View {
                 }
             }
             .padding(.bottom, 80)
+            .coordinateSpace(name: "project")
+            .onPreferenceChange(SectionFramesPreferenceKey.self) { value in
+                dragController.sectionFrames = value
+            }
+            .onPreferenceChange(TaskFramesPreferenceKey.self) { value in
+                dragController.taskFrames = value
+            }
+            .overlay(alignment: .topLeading) {
+                if dragController.isActive,
+                   let taskId = dragController.draggingTaskId,
+                   let task = viewModel.tasks[projectId]?.first(where: { $0.id == taskId }) {
+                    DragGhostView(task: task)
+                        .frame(width: dragController.ghostSize.width, height: dragController.ghostSize.height)
+                        .offset(
+                            x: dragController.dragLocation.x - dragController.touchOffset.width,
+                            y: dragController.dragLocation.y - dragController.touchOffset.height
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .refreshable {
             await viewModel.loadAll()
         }
         .background(Theme.bgPage)
+        .environment(dragController)
         .sheet(item: $selectedTask) { task in
             TaskDetailSheet(viewModel: viewModel, task: task, onDismiss: { selectedTask = nil })
         }

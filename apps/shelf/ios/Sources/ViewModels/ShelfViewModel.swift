@@ -352,30 +352,56 @@ final class ShelfViewModel {
         APIClient.shared.attachmentURL(id: id)
     }
 
-    // MARK: - Local Reorder (for drag & drop)
+    // MARK: - Cross-section move (drag & drop)
 
-    func moveTaskLocally(projectId: String, fromIndex: Int, toIndex: Int, sectionId: String?) {
-        guard var projectTasks = tasks[projectId] else { return }
-        let sectionTasks = projectTasks.filter { $0.sectionId == sectionId }.sorted { $0.position < $1.position }
-        guard fromIndex < sectionTasks.count, toIndex < sectionTasks.count else { return }
+    func moveTaskToSection(
+        taskId: String,
+        projectId: String,
+        toSectionId: String?,
+        insertAt: Int
+    ) async {
+        guard var projectTasks = tasks[projectId],
+              let taskIdx = projectTasks.firstIndex(where: { $0.id == taskId }) else { return }
+        let snapshot = projectTasks
 
-        let movingTask = sectionTasks[fromIndex]
-        let targetTask = sectionTasks[toIndex]
+        var task = projectTasks[taskIdx]
+        projectTasks.remove(at: taskIdx)
+        task.sectionId = toSectionId
 
-        guard let fromGlobal = projectTasks.firstIndex(where: { $0.id == movingTask.id }),
-              let toGlobal = projectTasks.firstIndex(where: { $0.id == targetTask.id }) else { return }
-
-        let task = projectTasks.remove(at: fromGlobal)
-        projectTasks.insert(task, at: toGlobal)
-
-        // Update positions for section tasks
-        let updatedSectionTasks = projectTasks.filter { $0.sectionId == sectionId }
-        for (i, t) in updatedSectionTasks.enumerated() {
-            if let idx = projectTasks.firstIndex(where: { $0.id == t.id }) {
-                projectTasks[idx].position = i
+        let targetSectionTasks = projectTasks.filter { $0.sectionId == toSectionId }
+        let globalInsertIndex: Int
+        if insertAt >= targetSectionTasks.count {
+            if let lastInSection = targetSectionTasks.last,
+               let lastIdx = projectTasks.firstIndex(where: { $0.id == lastInSection.id }) {
+                globalInsertIndex = lastIdx + 1
+            } else {
+                globalInsertIndex = projectTasks.count
             }
+        } else {
+            let anchorTask = targetSectionTasks[insertAt]
+            globalInsertIndex = projectTasks.firstIndex(where: { $0.id == anchorTask.id }) ?? projectTasks.count
         }
+        projectTasks.insert(task, at: globalInsertIndex)
+
+        var pos = 0
+        for i in projectTasks.indices where projectTasks[i].sectionId == toSectionId {
+            projectTasks[i].position = pos
+            pos += 1
+        }
+
         tasks[projectId] = projectTasks
+
+        do {
+            _ = try await api.updateTask(id: taskId, projectId: projectId, sectionId: .some(toSectionId))
+            let orderedIds = projectTasks
+                .filter { $0.sectionId == toSectionId }
+                .map(\.id)
+            let items = orderedIds.enumerated().map { (id: $1, position: $0) }
+            try await api.reorderTasks(items: items)
+        } catch {
+            tasks[projectId] = snapshot
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - Helpers
