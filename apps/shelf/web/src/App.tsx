@@ -39,36 +39,51 @@ function Shell() {
 
   const isArchive = location.pathname === "/archive";
 
+  const refreshMeta = async (): Promise<Project[]> => {
+    const [ps, upcoming] = await Promise.all([
+      api.get<Project[]>("/projects"),
+      api.get<UpcomingTask[]>("/tasks/upcoming?days=3"),
+    ]);
+    setProjects(ps);
+
+    const backlogProject = ps.find((p) => p.name === "Backlog");
+    setBacklogUpcomingCount(
+      backlogProject
+        ? upcoming.filter((t) => t.project_id === backlogProject.id).length
+        : 0
+    );
+
+    const sectionResults = await Promise.all(
+      ps.map((p) => api.get<Section[]>(`/projects/${p.id}/sections`))
+    );
+    setAllSections(sectionResults.flat());
+    return ps;
+  };
+
   useEffect(() => {
     (async () => {
-      const [ps, upcoming] = await Promise.all([
-        api.get<Project[]>("/projects"),
-        api.get<UpcomingTask[]>("/tasks/upcoming?days=3"),
-      ]);
-      setProjects(ps);
-
-      // Count upcoming tasks in Backlog project only
-      const backlogProject = ps.find((p) => p.name === "Backlog");
-      if (backlogProject) {
-        setBacklogUpcomingCount(
-          upcoming.filter((t) => t.project_id === backlogProject.id).length
-        );
-      }
-
-      // Fetch all sections for move UI
-      const sectionResults = await Promise.all(
-        ps.map((p) => api.get<Section[]>(`/projects/${p.id}/sections`))
-      );
-      setAllSections(sectionResults.flat());
-
+      const ps = await refreshMeta();
       setLoading(false);
-
-      // Default: navigate to main project
       if (!isArchive && ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
         const main = findMainProject(ps);
         if (main) navigate(`/projects/${main.id}`, { replace: true });
       }
     })();
+  }, []);
+
+  // Auto-refresh when the tab/window regains focus.
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshMeta().catch(() => {});
+      setRefreshKey((k) => k + 1);
+    };
+    document.addEventListener("visibilitychange", handler);
+    window.addEventListener("focus", handler);
+    return () => {
+      document.removeEventListener("visibilitychange", handler);
+      window.removeEventListener("focus", handler);
+    };
   }, []);
 
   const handleNavigate = (path: string) => {

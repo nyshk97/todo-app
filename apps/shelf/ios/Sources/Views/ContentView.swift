@@ -8,6 +8,7 @@ enum AppDestination: Hashable {
 struct ContentView: View {
     @State private var viewModel = ShelfViewModel()
     @State private var path = NavigationPath()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -67,6 +68,11 @@ struct ContentView: View {
         }
         .task {
             await viewModel.loadAll()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active && oldPhase != .active {
+                Swift.Task { await viewModel.loadAll() }
+            }
         }
     }
 
