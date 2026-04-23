@@ -108,6 +108,7 @@ struct TaskListView: View {
     @State private var newTaskTitle = ""
     @State private var isAdding = false
     @FocusState private var isTextFieldFocused: Bool
+    @GestureState private var pickedUpTaskId: String?
 
     private var isDropTarget: Bool {
         dragController.isActive && dragController.currentDropTarget?.sectionId == sectionId
@@ -130,6 +131,11 @@ struct TaskListView: View {
                 TaskRow(
                     task: task,
                     onTap: { onSelect(task) }
+                )
+                .background(
+                    (pickedUpTaskId == task.id && !dragController.isActive)
+                        ? Theme.accentBright.opacity(0.12)
+                        : Color.clear
                 )
                 .opacity(dragController.draggingTaskId == task.id ? 0.3 : 1.0)
                 .overlay(alignment: .top) {
@@ -222,6 +228,14 @@ struct TaskListView: View {
     private func dragGesture(for task: Task) -> some Gesture {
         LongPressGesture(minimumDuration: 0.4)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("project")))
+            .updating($pickedUpTaskId) { value, state, _ in
+                switch value {
+                case .first(true), .second(true, _):
+                    state = task.id
+                default:
+                    state = nil
+                }
+            }
             .onChanged { value in
                 switch value {
                 case .first(true):
