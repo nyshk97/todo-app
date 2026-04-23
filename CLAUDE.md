@@ -58,7 +58,10 @@
 
 ## iOS
 
-- SwiftUI の `.onDrag`/`.onDrop` はセクション間移動に不向き（アニメーション制御の限界、スクロールとの競合）。セクション間の移動は「移動」シートで対応する方針
+- SwiftUI 標準の `.onDrag`/`.onDrop` はセクション間 D&D に不向き（アニメーション制御の限界、スクロールとの競合）。カスタム D&D は `LongPressGesture.sequenced(before: DragGesture)` + `PreferenceKey` で frame 収集 + `UIScrollView` introspection でオートスクロール、という構成で実装している（`DragController.swift` 参照）
+- カスタムジェスチャーを付ける View は `Button` を避けて `HStack + .onTapGesture` にする。`Button` + 外側 gesture は `.simultaneousGesture`（両発火）/ `.gesture`（Button 常勝）/ `.highPriorityGesture`（外側常勝）のどれも破綻する
+- ジェスチャーに紐づく一時状態は `@GestureState` を使うとキャンセル時も自動リセットされる。手動管理の `@State` フラグは `.onEnded` が呼ばれない経路で汚染されるリスクあり
+- 新規 Swift ファイルを追加したら `xcodegen generate` を再実行してからビルドする（自動では Xcode プロジェクトに含まれない）
 
 ## コンセプト
 
