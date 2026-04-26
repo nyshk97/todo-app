@@ -130,6 +130,7 @@ struct TaskListView: View {
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
+                    isPending: viewModel.pendingTaskIds.contains(task.id),
                     onTap: { onSelect(task) }
                 )
                 .background(

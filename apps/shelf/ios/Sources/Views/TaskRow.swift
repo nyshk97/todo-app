@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskRow: View {
     let task: Task
+    var isPending: Bool = false
     let onTap: () -> Void
 
     private var rowBackground: Color {
@@ -22,6 +23,12 @@ struct TaskRow: View {
                 .multilineTextAlignment(.leading)
 
             Spacer()
+
+            if isPending {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textQuaternary)
+            }
 
             // Comment badge
             if task.commentCount > 0 {

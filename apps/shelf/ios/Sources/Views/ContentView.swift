@@ -7,39 +7,15 @@ enum AppDestination: Hashable {
 
 struct ContentView: View {
     @State private var viewModel = ShelfViewModel()
+    @State private var network = NetworkMonitor.shared
     @State private var path = NavigationPath()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if let mainProject = mainProject {
-                    ProjectView(viewModel: viewModel, projectId: mainProject.id)
-                        .overlay(alignment: .bottomTrailing) {
-                            FabButton(
-                                viewModel: viewModel,
-                                backlogUpcomingCount: backlogUpcomingCount,
-                                onNavigateBacklog: {
-                                    if let backlog = backlogProject {
-                                        path.append(AppDestination.backlog(backlog.id))
-                                    }
-                                },
-                                onNavigateArchive: {
-                                    path.append(AppDestination.archive)
-                                }
-                            )
-                            .padding(.trailing, 20)
-                            .padding(.bottom, 20)
-                        }
-                } else if !viewModel.isLoading {
-                    Text("プロジェクトがありません")
-                        .foregroundStyle(Theme.textQuaternary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ProgressView()
-                        .tint(Theme.textTertiary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            VStack(spacing: 0) {
+                OfflineBanner(isOnline: network.isOnline, pendingCount: viewModel.pendingCount)
+                mainContent
             }
             .background(Theme.bgPage)
             .navigationDestination(for: AppDestination.self) { dest in
@@ -73,6 +49,42 @@ struct ContentView: View {
             if newPhase == .active && oldPhase != .active {
                 Swift.Task { await viewModel.loadAll() }
             }
+        }
+        .onChange(of: network.isOnline) { wasOnline, isOnline in
+            if isOnline && !wasOnline {
+                Swift.Task { await viewModel.sync() }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if let mainProject = mainProject {
+            ProjectView(viewModel: viewModel, projectId: mainProject.id)
+                .overlay(alignment: .bottomTrailing) {
+                    FabButton(
+                        viewModel: viewModel,
+                        backlogUpcomingCount: backlogUpcomingCount,
+                        onNavigateBacklog: {
+                            if let backlog = backlogProject {
+                                path.append(AppDestination.backlog(backlog.id))
+                            }
+                        },
+                        onNavigateArchive: {
+                            path.append(AppDestination.archive)
+                        }
+                    )
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
+        } else if !viewModel.isLoading {
+            Text("プロジェクトがありません")
+                .foregroundStyle(Theme.textQuaternary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ProgressView()
+                .tint(Theme.textTertiary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

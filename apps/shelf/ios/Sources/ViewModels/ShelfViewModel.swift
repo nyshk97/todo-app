@@ -16,8 +16,27 @@ final class ShelfViewModel {
     var isLoading = false
     var errorMessage: String?
     var toasts: [ToastItem] = []
+    var pendingCount: Int = 0
+    var pendingTaskIds: Set<String> = []
 
     private let api = APIClient.shared
+    private let cache = LocalCache.shared
+    private let queue = SyncQueue.shared
+    private var didLoadCache = false
+    private var didLoadQueueState = false
+    private var isSyncing = false
+
+    private static func isNetworkError(_ error: Error) -> Bool {
+        // APIError はサーバーから HTTP 応答が返っている = ネットには繋がっている
+        !(error is APIError)
+    }
+
+    private func refreshPendingState() async {
+        let ids = await queue.pendingTaskIds()
+        let count = await queue.count()
+        pendingTaskIds = ids
+        pendingCount = count
+    }
 
     func showToast(_ message: String, retry: (() async -> Void)? = nil) {
         let item = ToastItem(message: message, retry: retry)
@@ -31,7 +50,25 @@ final class ShelfViewModel {
     // MARK: - Initial Load
 
     func loadAll() async {
-        isLoading = true
+        if !didLoadCache {
+            didLoadCache = true
+            if let snapshot = await cache.load() {
+                self.projects = snapshot.projects.sorted { $0.position < $1.position }
+                self.sections = snapshot.sections
+                self.tasks = snapshot.tasks
+            }
+        }
+        if !didLoadQueueState {
+            didLoadQueueState = true
+            await refreshPendingState()
+        }
+
+        // キューに溜まっているものを先に同期してからフェッチ。
+        // こうしないと「未同期の追加」が直後のフェッチで消える。
+        await sync()
+
+        let hasCache = !projects.isEmpty
+        if !hasCache { isLoading = true }
         errorMessage = nil
         do {
             let projects = try await api.fetchProjects()
@@ -49,10 +86,79 @@ final class ShelfViewModel {
 
             let upcoming = try await upcomingResult
             self.upcomingCount = upcoming.count
+
+            await persistCache()
         } catch {
-            errorMessage = error.localizedDescription
+            if !hasCache { errorMessage = error.localizedDescription }
         }
         isLoading = false
+    }
+
+    func persistCache() async {
+        let snapshot = CacheSnapshot(projects: projects, sections: sections, tasks: tasks)
+        await cache.save(snapshot)
+    }
+
+    // MARK: - Sync
+
+    /// キューに溜まっている操作を順次サーバーへ送信する。
+    /// オンライン時のみ実行。多重実行は防ぐ。
+    func sync() async {
+        guard NetworkMonitor.shared.isOnline, !isSyncing else { return }
+        let ops = await queue.snapshot()
+        guard !ops.isEmpty else { return }
+
+        isSyncing = true
+        defer { isSyncing = false }
+
+        for op in ops {
+            do {
+                switch op {
+                case .create(let localId, let projectId, let sectionId, let title):
+                    let task = try await api.createTask(title: title, projectId: projectId, sectionId: sectionId)
+                    // ローカルの temp-ID を本物 ID に差し替え
+                    if let idx = tasks[projectId]?.firstIndex(where: { $0.id == localId }) {
+                        tasks[projectId]?[idx] = task
+                    }
+                    // 後続キュー内の delete/updateTitle 対象 ID を解決
+                    await queue.resolveLocalId(localId, to: task.id)
+                case .delete(let taskId):
+                    do {
+                        try await api.deleteTask(id: taskId)
+                    } catch APIError.httpError(let code) where code == 404 {
+                        // 既に消えていれば成功扱い
+                    }
+                case .updateTitle(let taskId, let title):
+                    let updated = try await api.updateTask(id: taskId, title: title)
+                    // ローカル側にも反映（同期中に他の更新がなければ no-op）
+                    if let projectId = findProjectId(for: taskId),
+                       let idx = tasks[projectId]?.firstIndex(where: { $0.id == taskId }) {
+                        tasks[projectId]?[idx] = updated
+                    }
+                }
+                await queue.remove(op)
+                await refreshPendingState()
+            } catch {
+                if Self.isNetworkError(error) {
+                    // ネットが切れたら中断、次回トリガーで再開
+                    break
+                } else {
+                    // サーバー側エラー: 該当 op をスキップ（無限リトライ防止）
+                    await queue.remove(op)
+                    await refreshPendingState()
+                    showToast("同期に失敗した操作がありました")
+                }
+            }
+        }
+
+        await persistCache()
+    }
+
+    private func findProjectId(for taskId: String) -> String? {
+        for (pid, list) in tasks {
+            if list.contains(where: { $0.id == taskId }) { return pid }
+        }
+        return nil
     }
 
     // MARK: - Projects
@@ -170,15 +276,30 @@ final class ShelfViewModel {
             commentCount: 0, archivedAt: nil, createdAt: now, updatedAt: now
         )
         tasks[projectId, default: []].append(optimistic)
+
+        if !NetworkMonitor.shared.isOnline {
+            await queue.enqueueCreate(localId: tempId, projectId: projectId, sectionId: sectionId, title: title)
+            await refreshPendingState()
+            await persistCache()
+            return
+        }
+
         do {
             let task = try await api.createTask(title: title, projectId: projectId, sectionId: sectionId)
             if let idx = tasks[projectId]?.firstIndex(where: { $0.id == tempId }) {
                 tasks[projectId]?[idx] = task
             }
+            await persistCache()
         } catch {
-            tasks[projectId]?.removeAll { $0.id == tempId }
-            showToast("タスクの作成に失敗しました") { [weak self] in
-                await self?.createTask(title: title, projectId: projectId, sectionId: sectionId)
+            if Self.isNetworkError(error) {
+                await queue.enqueueCreate(localId: tempId, projectId: projectId, sectionId: sectionId, title: title)
+                await refreshPendingState()
+                await persistCache()
+            } else {
+                tasks[projectId]?.removeAll { $0.id == tempId }
+                showToast("タスクの作成に失敗しました") { [weak self] in
+                    await self?.createTask(title: title, projectId: projectId, sectionId: sectionId)
+                }
             }
         }
     }
@@ -190,6 +311,15 @@ final class ShelfViewModel {
         if let d = dueDate { optimistic.dueDate = d }
         replaceTask(old: task, new: optimistic)
 
+        let isTitleOnly = title != nil && dueDate == nil && projectId == nil && sectionId == nil
+
+        if isTitleOnly, !NetworkMonitor.shared.isOnline, let newTitle = title {
+            await queue.enqueueUpdateTitle(taskId: task.id, title: newTitle)
+            await refreshPendingState()
+            await persistCache()
+            return
+        }
+
         do {
             let updated = try await api.updateTask(
                 id: task.id,
@@ -199,10 +329,17 @@ final class ShelfViewModel {
                 dueDate: dueDate
             )
             replaceTask(old: optimistic, new: updated)
+            await persistCache()
         } catch {
-            replaceTask(old: optimistic, new: task)
-            showToast("タスクの更新に失敗しました") { [weak self] in
-                await self?.updateTask(task, title: title, dueDate: dueDate, projectId: projectId, sectionId: sectionId)
+            if isTitleOnly, Self.isNetworkError(error), let newTitle = title {
+                await queue.enqueueUpdateTitle(taskId: task.id, title: newTitle)
+                await refreshPendingState()
+                await persistCache()
+            } else {
+                replaceTask(old: optimistic, new: task)
+                showToast("タスクの更新に失敗しました") { [weak self] in
+                    await self?.updateTask(task, title: title, dueDate: dueDate, projectId: projectId, sectionId: sectionId)
+                }
             }
         }
     }
@@ -210,12 +347,38 @@ final class ShelfViewModel {
     func deleteTask(_ task: Task) async {
         let snapshot = tasks[task.projectId] ?? []
         tasks[task.projectId]?.removeAll { $0.id == task.id }
+
+        // temp-ID（未送信 create）なら create を取り消すだけ
+        if task.id.hasPrefix("temp-") {
+            _ = await queue.enqueueDelete(taskId: task.id)
+            await refreshPendingState()
+            await persistCache()
+            return
+        }
+
+        if !NetworkMonitor.shared.isOnline {
+            await queue.enqueueDelete(taskId: task.id)
+            await refreshPendingState()
+            await persistCache()
+            return
+        }
+
         do {
             try await api.deleteTask(id: task.id)
+            await persistCache()
         } catch {
-            tasks[task.projectId] = snapshot
-            showToast("タスクの削除に失敗しました") { [weak self] in
-                await self?.deleteTask(task)
+            if Self.isNetworkError(error) {
+                await queue.enqueueDelete(taskId: task.id)
+                await refreshPendingState()
+                await persistCache()
+            } else if case APIError.httpError(let code) = error, code == 404 {
+                // 既にサーバー側で消えている → 成功扱い
+                await persistCache()
+            } else {
+                tasks[task.projectId] = snapshot
+                showToast("タスクの削除に失敗しました") { [weak self] in
+                    await self?.deleteTask(task)
+                }
             }
         }
     }
