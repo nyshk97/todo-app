@@ -31,6 +31,7 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
+                viewModel.resetToTodayIfDayChanged()
                 Task { await viewModel.loadTodos() }
             }
         }

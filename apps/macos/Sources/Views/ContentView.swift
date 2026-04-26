@@ -28,9 +28,11 @@ struct ContentView: View {
             await viewModel.loadTodos()
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            viewModel.resetToTodayIfDayChanged()
             Task { await viewModel.loadTodos() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .panelDidShow)) { _ in
+            viewModel.resetToTodayIfDayChanged()
             Task { await viewModel.loadTodos() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .backgroundTapped)) { _ in

@@ -13,6 +13,7 @@ final class TodoViewModel {
 
     private let api = APIClient.shared
     private let calendar = Calendar.current
+    private var lastSeenDate: Date = .now
 
     var dateString: String {
         formatDate(currentDate)
@@ -142,6 +143,13 @@ final class TodoViewModel {
                 self.error = error.localizedDescription
             }
         }
+    }
+
+    func resetToTodayIfDayChanged() {
+        if !calendar.isDate(lastSeenDate, inSameDayAs: .now) {
+            currentDate = .now
+        }
+        lastSeenDate = .now
     }
 
     func goToPreviousDay() {
