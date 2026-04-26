@@ -1,9 +1,12 @@
+import SwiftData
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TodoViewModel()
+    @State private var monitor = NetworkMonitor.shared
     @FocusState private var isInputFocused: Bool
     @State private var draggingTodoId: String?
     @State private var editingTodoId: String?
@@ -27,12 +30,21 @@ struct ContentView: View {
         }
         .gesture(swipeGesture)
         .task {
+            viewModel.setContext(modelContext)
             await viewModel.loadTodos()
         }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 viewModel.resetToTodayIfDayChanged()
                 Task { await viewModel.loadTodos() }
+            }
+        }
+        .onChange(of: monitor.isOnline) { wasOnline, isOnline in
+            if !wasOnline && isOnline {
+                Task {
+                    await SyncEngine.shared.sync()
+                    await viewModel.loadTodos()
+                }
             }
         }
     }
@@ -42,9 +54,17 @@ struct ContentView: View {
     private var headerView: some View {
         ZStack {
             VStack(spacing: 4) {
-                Text(viewModel.dateLabel)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(colors.textPrimary)
+                HStack(spacing: 8) {
+                    Text(viewModel.dateLabel)
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(colors.textPrimary)
+                    if viewModel.isOffline {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(colors.textSecondary)
+                            .accessibilityLabel("Offline")
+                    }
+                }
                 Text(viewModel.dateSubLabel)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
