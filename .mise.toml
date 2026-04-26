@@ -38,6 +38,8 @@ description = "macOS アプリをビルドして起動"
 run = """
 bash scripts/generate-projects.sh
 cd apps/macos
+osascript -e 'tell application "TodoMac" to quit' 2>/dev/null || true
 xcodebuild build -project TodoMac.xcodeproj -scheme TodoMac -destination 'platform=macOS' CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO -quiet
-open $(find ~/Library/Developer/Xcode/DerivedData -name "TodoMac.app" -type d | head -1)
+APP_PATH=$(xcodebuild -project TodoMac.xcodeproj -scheme TodoMac -destination 'platform=macOS' -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR /{print $2}' | head -1)/TodoMac.app
+open "$APP_PATH"
 """
