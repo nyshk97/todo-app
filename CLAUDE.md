@@ -29,6 +29,7 @@
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
 - 実機インストール: `mise run build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Xcode の Devices and Simulators に .ipa をドラッグしてインストール。Cmd+R (Debug) だと Development profile が使われ約1週間で期限切れになるため Ad Hoc export を使うこと
 - `GENERATE_INFOPLIST_FILE: true` と `info:` (path なし) は XcodeGen で併用不可。カスタム値は `Secrets.swift` の自動生成で対応
+- XcodeGen で新規ファイルを追加すると SourceKit が一時的に偽陽性エラー（`Cannot find type X in scope` 等）を出すが、これは `.xcodeproj` 未再生成によるもの。`bash scripts/generate-projects.sh` 後に解消する。多数表示されてもひるまず、最後に `xcodebuild ... -sdk iphonesimulator build` で実ビルドして確認する
 
 ## macOS アプリ
 
@@ -38,6 +39,7 @@
 - パネル表示時に `NotificationCenter` 経由でデータを再読み込み
 - 署名なしでビルド: `CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO`
 - `isMovableByWindowBackground = true` だと `onDrag` が奪われる。ヘッダーのみに `WindowDragView`（NSViewRepresentable）を配置して対応
+- 「コードにあるはずの機能が見えない」場合はまず起動中バイナリが最新か疑う: `ps aux | grep TodoMac` で実行パスを確認し、DerivedData の mtime と比較する。古いキャッシュビルドを起動していることが原因の場合がある
 
 ## ビルド・リリース
 
