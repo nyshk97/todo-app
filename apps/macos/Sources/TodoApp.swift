@@ -50,8 +50,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hasShadow = true
         panel.minSize = NSSize(width: 300, height: 400)
 
-        // 右下に配置
-        positionAtBottomRight()
+        // 初回はカーソルを中心に配置
+        positionAtCursor()
         panel.orderFront(nil)
 
         // メニューバーアイコン
@@ -105,11 +105,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func positionAtBottomRight() {
-        guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.visibleFrame
-        let x = screenFrame.maxX - panel.frame.width - 16
-        let y = screenFrame.minY + 16
+    private func positionAtCursor() {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouse) }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+        guard let screen else { return }
+
+        let visible = screen.visibleFrame
+        let size = panel.frame.size
+
+        // カーソル中心に配置し、visibleFrame からはみ出る場合はクランプ
+        let centeredX = mouse.x - size.width / 2
+        let centeredY = mouse.y - size.height / 2
+        let x = max(visible.minX, min(centeredX, visible.maxX - size.width))
+        let y = max(visible.minY, min(centeredY, visible.maxY - size.height))
+
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
@@ -139,6 +150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showPanel() {
+        positionAtCursor()
         panel.orderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .panelDidShow, object: nil)
