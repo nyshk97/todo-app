@@ -1,3 +1,4 @@
+import ApplicationServices
 import SwiftUI
 
 @main
@@ -19,6 +20,11 @@ class KeyablePanel: NSPanel {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: NSPanel!
+
+    private var globalKeyMonitor: Any?
+    private var localKeyMonitor: Any?
+    private var lastRightShiftPressTime: TimeInterval = 0
+    private var rightShiftWasDown = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -54,6 +60,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: "Todo")
             button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+
+        setupGlobalHotkey()
+    }
+
+    // MARK: - 右Shift ダブルタップでパネル表示/非表示をトグル
+
+    private func setupGlobalHotkey() {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleFlagsChanged(event)
+        }
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleFlagsChanged(event)
+            return event
+        }
+    }
+
+    private func handleFlagsChanged(_ event: NSEvent) {
+        // keyCode 60 = Right Shift, raw bit 0x4 = NX_DEVICERSHIFTKEYMASK
+        guard event.keyCode == 60 else { return }
+        let isDown = (event.modifierFlags.rawValue & 0x4) != 0
+
+        defer { rightShiftWasDown = isDown }
+        guard isDown, !rightShiftWasDown else { return }
+
+        let now = event.timestamp
+        if now - lastRightShiftPressTime < 0.3 {
+            lastRightShiftPressTime = 0
+            hotkeyToggle()
+        } else {
+            lastRightShiftPressTime = now
+        }
+    }
+
+    private func hotkeyToggle() {
+        if panel.isVisible && NSApp.isActive {
+            panel.orderOut(nil)
+        } else {
+            showPanel()
         }
     }
 
