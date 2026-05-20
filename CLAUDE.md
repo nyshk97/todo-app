@@ -40,6 +40,7 @@
 - 署名なしでビルド: `CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO`
 - `isMovableByWindowBackground = true` だと `onDrag` が奪われる。ヘッダーのみに `WindowDragView`（NSViewRepresentable）を配置して対応
 - 「コードにあるはずの機能が見えない」場合はまず起動中バイナリが最新か疑う: `ps aux | grep TodoMac` で実行パスを確認し、DerivedData の mtime と比較する。古いキャッシュビルドを起動していることが原因の場合がある
+- Accessibility 権限はバンドルパスと署名に紐づく。未署名ビルド (`CODE_SIGN_IDENTITY="-"`) を `scripts/build.sh` で作り直したり brew で `/Applications/` 側に移ったりすると別アプリ扱いになり、System Settings → Privacy & Security → Accessibility で再付与が必要になる。グローバルホットキーが効かなくなったらまずここを疑う
 
 ## ビルド・リリース
 
