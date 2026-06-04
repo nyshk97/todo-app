@@ -68,16 +68,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 右Shift ダブルタップでパネル表示/非表示をトグル
 
     private func setupGlobalHotkey() {
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
-
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.handleFlagsChanged(event)
-        }
+        // ローカルモニターは Accessibility 権限不要なので即座に登録
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
             return event
         }
+
+        // 起動直後は TCC デーモンの初期化が完了していないことがあるため遅延させる
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.registerGlobalMonitor()
+        }
+    }
+
+    private func registerGlobalMonitor() {
+        // 起動時は prompt を出さない。未権限でも登録はできる（コールバックが届かないだけ）
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.handleFlagsChanged(event)
+        }
+    }
+
+    @objc private func requestAccessibilityPermission() {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
@@ -134,6 +146,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             versionItem.isEnabled = false
             menu.addItem(versionItem)
             menu.addItem(NSMenuItem.separator())
+            if !AXIsProcessTrusted() {
+                menu.addItem(NSMenuItem(title: "アクセシビリティ権限を許可...", action: #selector(requestAccessibilityPermission), keyEquivalent: ""))
+                menu.addItem(NSMenuItem.separator())
+            }
             menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
