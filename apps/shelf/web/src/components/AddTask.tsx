@@ -4,6 +4,8 @@ interface AddTaskProps {
   onAdd: (title: string) => void;
 }
 
+const taskTitleIndent = 36;
+
 export function AddTask({ onAdd }: AddTaskProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -26,7 +28,7 @@ export function AddTask({ onAdd }: AddTaskProps) {
           alignItems: "center",
           gap: 6,
           width: "100%",
-          padding: "6px 12px",
+          padding: `6px 12px 6px ${taskTitleIndent}px`,
           border: "none",
           borderRadius: "var(--radius-sm)",
           background: "transparent",
@@ -44,7 +46,7 @@ export function AddTask({ onAdd }: AddTaskProps) {
   }
 
   return (
-    <div style={{ padding: "4px 12px" }}>
+    <div style={{ padding: `4px 12px 4px ${taskTitleIndent}px` }}>
       <input
         autoFocus
         value={title}
