@@ -1,5 +1,31 @@
 # 動作確認手順
 
+## Web
+
+### コード変更後のビルド検証
+
+Web UI 変更後に TypeScript と Vite の本番ビルドが通ることを確認する。
+
+```bash
+cd apps/web
+npm run build
+```
+
+- 末尾に `✓ built in` が出れば pass
+- 型エラーや Vite build error が出たら fail
+
+### UI 変更後のローカル表示確認
+
+ローカルの Vite サーバーで対象画面を開き、変更した UI が意図した状態で表示されることを確認する。
+
+```bash
+cd apps/web
+VITE_API_URL=https://todo-shelf-api.d0ne1s-todo.workers.dev npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+- `http://127.0.0.1:5173/` をブラウザで開き、対象 UI を目視確認できれば pass
+- API データが必要な確認では、データ作成や削除を伴わない操作に留める
+
 ## iOS
 
 ### コード変更後のビルド検証

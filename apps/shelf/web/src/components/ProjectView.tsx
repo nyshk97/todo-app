@@ -27,6 +27,110 @@ interface ProjectViewProps {
   onClickTask: (task: Task) => void;
 }
 
+function AddSectionDivider({
+  isEditing,
+  name,
+  onNameChange,
+  onStart,
+  onSubmit,
+  onCancel,
+}: {
+  isEditing: boolean;
+  name: string;
+  onNameChange: (value: string) => void;
+  onStart: () => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const line = (
+    <span
+      aria-hidden="true"
+      style={{
+        height: 1,
+        flex: 1,
+        minWidth: 24,
+        background: "var(--border-subtle)",
+      }}
+    />
+  );
+
+  if (isEditing) {
+    return (
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+      }}>
+        {line}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flex: "0 1 280px",
+          minWidth: 0,
+        }}>
+          <span style={{ color: "var(--text-quaternary)", fontSize: 14 }}>＋</span>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit();
+              if (e.key === "Escape") onCancel();
+            }}
+            onBlur={(e) => {
+              if (!e.currentTarget.value.trim()) onCancel();
+            }}
+            placeholder="セクション名..."
+            style={{
+              width: "100%",
+              minWidth: 0,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--border-standard)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--text-primary)",
+              padding: "4px 8px",
+              fontSize: 13,
+              outline: "none",
+            }}
+          />
+        </div>
+        {line}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onStart}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "10px 12px",
+        border: "none",
+        background: "transparent",
+        color: "var(--text-quaternary)",
+        fontSize: 12,
+        fontWeight: 510,
+        transition: "color 0.1s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-quaternary)")}
+    >
+      {line}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 14 }}>＋</span>
+        セクションを追加
+      </span>
+      {line}
+    </button>
+  );
+}
+
 function parseDragId(id: string): { type: "section" | "task" | "droppable"; rawId: string } {
   const s = String(id);
   if (s.startsWith("section-")) return { type: "section", rawId: s.slice(8) };
@@ -336,50 +440,17 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         </SortableContext>
       </DndContext>
 
-      {/* Add section */}
-      {showAddSection ? (
-        <div style={{ padding: "4px 12px", display: "flex", gap: 8 }}>
-          <input
-            autoFocus
-            value={addingSectionName}
-            onChange={(e) => setAddingSectionName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddSection();
-              if (e.key === "Escape") { setShowAddSection(false); setAddingSectionName(""); }
-            }}
-            onBlur={() => { if (!addingSectionName.trim()) { setShowAddSection(false); } }}
-            placeholder="セクション名..."
-            style={{
-              flex: 1,
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid var(--border-standard)",
-              borderRadius: "var(--radius-sm)",
-              color: "var(--text-primary)",
-              padding: "4px 8px",
-              fontSize: 13,
-              outline: "none",
-            }}
-          />
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowAddSection(true)}
-          style={{
-            padding: "6px 12px",
-            border: "none",
-            borderRadius: "var(--radius-sm)",
-            background: "transparent",
-            color: "var(--text-quaternary)",
-            fontSize: 12,
-            fontWeight: 510,
-            transition: "color 0.1s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-quaternary)")}
-        >
-          ＋ セクションを追加
-        </button>
-      )}
+      <AddSectionDivider
+        isEditing={showAddSection}
+        name={addingSectionName}
+        onNameChange={setAddingSectionName}
+        onStart={() => setShowAddSection(true)}
+        onSubmit={handleAddSection}
+        onCancel={() => {
+          setShowAddSection(false);
+          setAddingSectionName("");
+        }}
+      />
     </div>
   );
 }
