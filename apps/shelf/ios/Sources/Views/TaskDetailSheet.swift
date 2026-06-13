@@ -6,6 +6,7 @@ struct TaskDetailSheet: View {
     @State var task: Task
     let onDismiss: () -> Void
 
+    @State private var network = NetworkMonitor.shared
     @State private var editingTitle: String = ""
     @FocusState private var isTitleFocused: Bool
     @State private var showDatePicker = false
@@ -52,6 +53,13 @@ struct TaskDetailSheet: View {
         .presentationDragIndicator(.visible)
         .task {
             comments = await viewModel.fetchComments(taskId: task.id)
+        }
+        .onChange(of: network.isOnline) { wasOnline, isOnline in
+            if isOnline && !wasOnline && comments.isEmpty {
+                Swift.Task {
+                    comments = await viewModel.fetchComments(taskId: task.id)
+                }
+            }
         }
         .alert("タスクを削除しますか？", isPresented: $showDeleteConfirm) {
             Button("削除", role: .destructive) {
@@ -160,6 +168,7 @@ struct TaskDetailSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Theme.textQuaternary)
                     }
+                    .disabled(!network.isOnline)
                 } else {
                     Text("未設定")
                         .font(.subheadline)
@@ -177,9 +186,10 @@ struct TaskDetailSheet: View {
                     Image(systemName: "calendar")
                         .foregroundStyle(Theme.textSecondary)
                 }
+                .disabled(!network.isOnline)
             }
 
-            if showDatePicker {
+            if showDatePicker && network.isOnline {
                 DatePicker("", selection: $selectedDate, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .tint(Theme.orange)
@@ -212,6 +222,7 @@ struct TaskDetailSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.textSecondary)
             }
+            .disabled(!network.isOnline)
 
             Spacer()
 
@@ -222,6 +233,7 @@ struct TaskDetailSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.green)
             }
+            .disabled(!network.isOnline)
         }
         .padding(12)
         .background(Theme.bgSurface)
@@ -236,10 +248,17 @@ struct TaskDetailSheet: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.textTertiary)
 
+            if !network.isOnline {
+                Text("コメントはオンライン時のみ表示・編集できます")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textQuaternary)
+            }
+
             ForEach(comments) { comment in
                 CommentRow(
                     comment: comment,
                     viewModel: viewModel,
+                    isOnline: network.isOnline,
                     onUpdate: { content in
                         if let updated = await viewModel.updateComment(comment, content: content) {
                             if let idx = comments.firstIndex(where: { $0.id == comment.id }) {
@@ -248,14 +267,15 @@ struct TaskDetailSheet: View {
                         }
                     },
                     onDelete: {
-                        await viewModel.deleteComment(comment)
-                        comments.removeAll { $0.id == comment.id }
-                        task.commentCount -= 1
-                        viewModel.updateCommentCount(taskId: task.id, projectId: task.projectId, delta: -1)
+                        if await viewModel.deleteComment(comment) {
+                            comments.removeAll { $0.id == comment.id }
+                            task.commentCount -= 1
+                            viewModel.updateCommentCount(taskId: task.id, projectId: task.projectId, delta: -1)
+                        }
                     },
                     onDeleteAttachment: { attachmentId in
-                        await viewModel.deleteAttachment(id: attachmentId)
-                        if let cIdx = comments.firstIndex(where: { $0.id == comment.id }) {
+                        if await viewModel.deleteAttachment(id: attachmentId),
+                           let cIdx = comments.firstIndex(where: { $0.id == comment.id }) {
                             comments[cIdx].attachments.removeAll { $0.id == attachmentId }
                         }
                     }
@@ -263,7 +283,7 @@ struct TaskDetailSheet: View {
             }
 
             // Pending files preview
-            if !pendingFiles.isEmpty {
+            if network.isOnline && !pendingFiles.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(pendingFiles.enumerated()), id: \.offset) { index, file in
                         HStack(spacing: 8) {
@@ -291,45 +311,47 @@ struct TaskDetailSheet: View {
             }
 
             // Add comment
-            HStack(spacing: 8) {
-                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: max(0, 5 - pendingFiles.count), matching: .images) {
-                    Image(systemName: "photo")
-                        .foregroundStyle(Theme.textTertiary)
-                        .font(.subheadline)
-                }
-
-                Button {
-                    showFilePicker = true
-                } label: {
-                    Image(systemName: "paperclip")
-                        .foregroundStyle(Theme.textTertiary)
-                        .font(.subheadline)
-                }
-
-                ZStack(alignment: .leading) {
-                    if newCommentText.isEmpty {
-                        Text("コメントを追加")
-                            .foregroundStyle(Theme.textQuaternary)
+            if network.isOnline {
+                HStack(spacing: 8) {
+                    PhotosPicker(selection: $selectedPhotos, maxSelectionCount: max(0, 5 - pendingFiles.count), matching: .images) {
+                        Image(systemName: "photo")
+                            .foregroundStyle(Theme.textTertiary)
                             .font(.subheadline)
                     }
-                    TextEditor(text: $newCommentText)
-                        .foregroundStyle(Theme.textPrimary)
-                        .font(.subheadline)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 20, maxHeight: 100)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
-                if !newCommentText.isEmpty || !pendingFiles.isEmpty {
-                    Button { submitComment() } label: {
-                        Image(systemName: "arrow.up.circle.fill")
+                    Button {
+                        showFilePicker = true
+                    } label: {
+                        Image(systemName: "paperclip")
                             .foregroundStyle(Theme.textTertiary)
+                            .font(.subheadline)
+                    }
+
+                    ZStack(alignment: .leading) {
+                        if newCommentText.isEmpty {
+                            Text("コメントを追加")
+                                .foregroundStyle(Theme.textQuaternary)
+                                .font(.subheadline)
+                        }
+                        TextEditor(text: $newCommentText)
+                            .foregroundStyle(Theme.textPrimary)
+                            .font(.subheadline)
+                            .scrollContentBackground(.hidden)
+                            .frame(minHeight: 20, maxHeight: 100)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if !newCommentText.isEmpty || !pendingFiles.isEmpty {
+                        Button { submitComment() } label: {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .foregroundStyle(Theme.textTertiary)
+                        }
                     }
                 }
+                .padding(10)
+                .background(Theme.bgElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .padding(10)
-            .background(Theme.bgElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .padding(12)
         .background(Theme.bgSurface)
@@ -373,6 +395,7 @@ struct TaskDetailSheet: View {
 struct CommentRow: View {
     let comment: Comment
     let viewModel: ShelfViewModel
+    let isOnline: Bool
     let onUpdate: (String) async -> Void
     let onDelete: () async -> Void
     let onDeleteAttachment: (String) async -> Void
@@ -403,9 +426,13 @@ struct CommentRow: View {
 
             // Attachments
             ForEach(comment.attachments) { attachment in
-                AttachmentView(attachment: attachment, viewModel: viewModel) {
-                    Swift.Task { await onDeleteAttachment(attachment.id) }
-                }
+                AttachmentView(
+                    attachment: attachment,
+                    viewModel: viewModel,
+                    onDelete: isOnline ? {
+                        Swift.Task { await onDeleteAttachment(attachment.id) }
+                    } : nil
+                )
             }
 
             Text(formatTimestamp(comment.createdAt))
@@ -417,16 +444,18 @@ struct CommentRow: View {
         .background(Theme.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .contextMenu {
-            Button {
-                editText = comment.content
-                isEditing = true
-            } label: {
-                Label("編集", systemImage: "pencil")
-            }
-            Button(role: .destructive) {
-                Swift.Task { await onDelete() }
-            } label: {
-                Label("削除", systemImage: "trash")
+            if isOnline {
+                Button {
+                    editText = comment.content
+                    isEditing = true
+                } label: {
+                    Label("編集", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    Swift.Task { await onDelete() }
+                } label: {
+                    Label("削除", systemImage: "trash")
+                }
             }
         }
     }

@@ -52,7 +52,7 @@ struct ContentView: View {
         }
         .onChange(of: network.isOnline) { wasOnline, isOnline in
             if isOnline && !wasOnline {
-                Swift.Task { await viewModel.sync() }
+                Swift.Task { await viewModel.loadAll() }
             }
         }
     }
@@ -78,9 +78,22 @@ struct ContentView: View {
                     .padding(.bottom, 20)
                 }
         } else if !viewModel.isLoading {
-            Text("プロジェクトがありません")
+            if !network.isOnline {
+                VStack(spacing: 10) {
+                    Image(systemName: "wifi.slash")
+                        .font(.title2)
+                    Text("オフラインです")
+                        .font(.headline)
+                    Text("一度オンラインで開くとキャッシュを表示できます")
+                        .font(.subheadline)
+                }
                 .foregroundStyle(Theme.textQuaternary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Text("プロジェクトがありません")
+                    .foregroundStyle(Theme.textQuaternary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         } else {
             ProgressView()
                 .tint(Theme.textTertiary)

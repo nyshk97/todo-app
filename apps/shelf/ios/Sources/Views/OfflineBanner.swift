@@ -25,7 +25,7 @@ struct OfflineBanner: View {
         switch (isOnline, pendingCount) {
         case (false, 0): return "オフライン"
         case (false, let n): return "オフライン · \(n)件未同期"
-        case (true, let n): return "\(n)件同期中…"
+        case (true, let n): return "\(n)件同期待ち"
         }
     }
 }

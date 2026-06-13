@@ -26,9 +26,39 @@ final class ShelfViewModel {
     private var didLoadQueueState = false
     private var isSyncing = false
 
+    private var isOnline: Bool {
+        NetworkMonitor.shared.isOnline
+    }
+
+    private static let retryableURLErrorCodes: Set<URLError.Code> = [
+        .timedOut,
+        .cannotFindHost,
+        .cannotConnectToHost,
+        .networkConnectionLost,
+        .dnsLookupFailed,
+        .notConnectedToInternet,
+        .internationalRoamingOff,
+        .callIsActive,
+        .dataNotAllowed,
+    ]
+
     private static func isNetworkError(_ error: Error) -> Bool {
-        // APIError はサーバーから HTTP 応答が返っている = ネットには繋がっている
-        !(error is APIError)
+        if let urlError = error as? URLError {
+            return retryableURLErrorCodes.contains(urlError.code)
+        }
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return retryableURLErrorCodes.contains(URLError.Code(rawValue: nsError.code))
+        }
+        return false
+    }
+
+    private func requireOnline(_ message: String = "この操作はオンライン時のみ使えます") -> Bool {
+        guard isOnline else {
+            showToast(message)
+            return false
+        }
+        return true
     }
 
     private func refreshPendingState() async {
@@ -63,11 +93,17 @@ final class ShelfViewModel {
             await refreshPendingState()
         }
 
+        let hasCache = !projects.isEmpty
+        guard isOnline else {
+            isLoading = false
+            errorMessage = nil
+            return
+        }
+
         // キューに溜まっているものを先に同期してからフェッチ。
         // こうしないと「未同期の追加」が直後のフェッチで消える。
         await sync()
 
-        let hasCache = !projects.isEmpty
         if !hasCache { isLoading = true }
         errorMessage = nil
         do {
@@ -104,7 +140,7 @@ final class ShelfViewModel {
     /// キューに溜まっている操作を順次サーバーへ送信する。
     /// オンライン時のみ実行。多重実行は防ぐ。
     func sync() async {
-        guard NetworkMonitor.shared.isOnline, !isSyncing else { return }
+        guard isOnline, !isSyncing else { return }
         let ops = await queue.snapshot()
         guard !ops.isEmpty else { return }
 
@@ -164,6 +200,7 @@ final class ShelfViewModel {
     // MARK: - Projects
 
     func createProject(name: String) async {
+        guard requireOnline() else { return }
         do {
             let project = try await api.createProject(name: name)
             projects.append(project)
@@ -173,6 +210,7 @@ final class ShelfViewModel {
     }
 
     func updateProject(_ project: Project, name: String) async {
+        guard requireOnline() else { return }
         do {
             let updated = try await api.updateProject(id: project.id, name: name)
             if let idx = projects.firstIndex(where: { $0.id == project.id }) {
@@ -184,6 +222,7 @@ final class ShelfViewModel {
     }
 
     func deleteProject(_ project: Project) async {
+        guard requireOnline() else { return }
         do {
             try await api.deleteProject(id: project.id)
             projects.removeAll { $0.id == project.id }
@@ -201,6 +240,7 @@ final class ShelfViewModel {
     }
 
     func createSection(projectId: String, name: String) async {
+        guard requireOnline("セクション操作はオンライン時のみ使えます") else { return }
         do {
             let section = try await api.createSection(projectId: projectId, name: name)
             sections[projectId, default: []].append(section)
@@ -210,6 +250,7 @@ final class ShelfViewModel {
     }
 
     func updateSection(_ section: Section, name: String) async {
+        guard requireOnline("セクション操作はオンライン時のみ使えます") else { return }
         do {
             let updated = try await api.updateSection(id: section.id, name: name)
             if let idx = sections[section.projectId]?.firstIndex(where: { $0.id == section.id }) {
@@ -221,6 +262,7 @@ final class ShelfViewModel {
     }
 
     func deleteSection(_ section: Section) async {
+        guard requireOnline("セクション操作はオンライン時のみ使えます") else { return }
         do {
             try await api.deleteSection(id: section.id)
             sections[section.projectId]?.removeAll { $0.id == section.id }
@@ -241,6 +283,7 @@ final class ShelfViewModel {
     }
 
     func reorderSections(projectId: String, sectionIds: [String]) async {
+        guard requireOnline("セクションの並び替えはオンライン時のみ使えます") else { return }
         let items = sectionIds.enumerated().map { (idx, id) in (id: id, position: idx) }
         // Optimistic update
         if var secs = sections[projectId] {
@@ -277,7 +320,7 @@ final class ShelfViewModel {
         )
         tasks[projectId, default: []].append(optimistic)
 
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnline {
             await queue.enqueueCreate(localId: tempId, projectId: projectId, sectionId: sectionId, title: title)
             await refreshPendingState()
             await persistCache()
@@ -305,15 +348,18 @@ final class ShelfViewModel {
     }
 
     func updateTask(_ task: Task, title: String? = nil, dueDate: String?? = nil, projectId: String? = nil, sectionId: String?? = nil) async {
+        let isTitleOnly = title != nil && dueDate == nil && projectId == nil && sectionId == nil
+        if !isTitleOnly {
+            guard requireOnline("このタスク操作はオンライン時のみ使えます") else { return }
+        }
+
         // Optimistic update
         var optimistic = task
         if let t = title { optimistic.title = t }
         if let d = dueDate { optimistic.dueDate = d }
         replaceTask(old: task, new: optimistic)
 
-        let isTitleOnly = title != nil && dueDate == nil && projectId == nil && sectionId == nil
-
-        if isTitleOnly, !NetworkMonitor.shared.isOnline, let newTitle = title {
+        if isTitleOnly, !isOnline, let newTitle = title {
             await queue.enqueueUpdateTitle(taskId: task.id, title: newTitle)
             await refreshPendingState()
             await persistCache()
@@ -356,7 +402,7 @@ final class ShelfViewModel {
             return
         }
 
-        if !NetworkMonitor.shared.isOnline {
+        if !isOnline {
             await queue.enqueueDelete(taskId: task.id)
             await refreshPendingState()
             await persistCache()
@@ -384,6 +430,7 @@ final class ShelfViewModel {
     }
 
     func moveTask(_ task: Task, toProjectId: String, sectionId: String?) async {
+        guard requireOnline("移動はオンライン時のみ使えます") else { return }
         do {
             let updated = try await api.updateTask(
                 id: task.id,
@@ -398,6 +445,7 @@ final class ShelfViewModel {
     }
 
     func reorderTasks(projectId: String, sectionId: String?, taskIds: [String]) async {
+        guard requireOnline("並び替えはオンライン時のみ使えます") else { return }
         let items = taskIds.enumerated().map { (idx, id) in (id: id, position: idx) }
         // Optimistic update
         if var projectTasks = tasks[projectId] {
@@ -417,6 +465,7 @@ final class ShelfViewModel {
     }
 
     func moveTaskToToday(_ task: Task) async {
+        guard requireOnline("今日のTODOへの移動はオンライン時のみ使えます") else { return }
         do {
             let sectionName = task.sectionId.flatMap { sid in
                 sections[task.projectId]?.first { $0.id == sid }?.name
@@ -438,6 +487,7 @@ final class ShelfViewModel {
     var archivedTasks: [ArchivedTask] = []
 
     func fetchArchivedTasks() async {
+        guard requireOnline("アーカイブはオンライン時のみ読み込めます") else { return }
         do {
             archivedTasks = try await api.fetchArchivedTasks()
         } catch {
@@ -446,6 +496,7 @@ final class ShelfViewModel {
     }
 
     func restoreTask(_ archivedTask: ArchivedTask) async {
+        guard requireOnline("アーカイブ操作はオンライン時のみ使えます") else { return }
         do {
             let task = try await api.restoreTask(id: archivedTask.id)
             archivedTasks.removeAll { $0.id == archivedTask.id }
@@ -456,6 +507,7 @@ final class ShelfViewModel {
     }
 
     func deleteArchivedTask(_ archivedTask: ArchivedTask) async {
+        guard requireOnline("アーカイブ操作はオンライン時のみ使えます") else { return }
         do {
             try await api.deleteTask(id: archivedTask.id)
             archivedTasks.removeAll { $0.id == archivedTask.id }
@@ -467,6 +519,7 @@ final class ShelfViewModel {
     // MARK: - Comments
 
     func fetchComments(taskId: String) async -> [Comment] {
+        guard isOnline else { return [] }
         do {
             return try await api.fetchComments(taskId: taskId)
         } catch {
@@ -476,6 +529,7 @@ final class ShelfViewModel {
     }
 
     func createComment(taskId: String, content: String, files: [(data: Data, filename: String, mimeType: String)] = []) async -> Comment? {
+        guard requireOnline("コメントはオンライン時のみ使えます") else { return nil }
         do {
             return try await api.createComment(taskId: taskId, content: content, files: files)
         } catch {
@@ -485,6 +539,7 @@ final class ShelfViewModel {
     }
 
     func updateComment(_ comment: Comment, content: String) async -> Comment? {
+        guard requireOnline("コメントはオンライン時のみ使えます") else { return nil }
         do {
             return try await api.updateComment(id: comment.id, content: content)
         } catch {
@@ -493,21 +548,27 @@ final class ShelfViewModel {
         }
     }
 
-    func deleteComment(_ comment: Comment) async {
+    func deleteComment(_ comment: Comment) async -> Bool {
+        guard requireOnline("コメントはオンライン時のみ使えます") else { return false }
         do {
             try await api.deleteComment(id: comment.id)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     // MARK: - Attachments
 
-    func deleteAttachment(id: String) async {
+    func deleteAttachment(id: String) async -> Bool {
+        guard requireOnline("添付ファイル操作はオンライン時のみ使えます") else { return false }
         do {
             try await api.deleteAttachment(id: id)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -523,6 +584,7 @@ final class ShelfViewModel {
         toSectionId: String?,
         insertAt: Int
     ) async {
+        guard requireOnline("移動はオンライン時のみ使えます") else { return }
         guard var projectTasks = tasks[projectId],
               let taskIdx = projectTasks.firstIndex(where: { $0.id == taskId }) else { return }
         let snapshot = projectTasks
