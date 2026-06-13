@@ -43,3 +43,7 @@ xcodebuild -project Shelf.xcodeproj -scheme Shelf \
 - 末尾が `** BUILD SUCCEEDED **` なら pass
 - 警告抽出: `... 2>&1 | grep -E "(warning:|error:)" | grep -v AppIntents.framework`
 - `AppIntents.framework` 関連 warning は AppIntents 未使用のため無視
+
+### オフライン回帰確認
+
+一度オンラインで読み込んで cache を作った後、機内モードで一覧が表示されること、タスク追加・削除・タイトル更新が即時反映され未同期表示になること、オンライン復帰後に同期されることを確認する。コメント/添付/due date/移動/並び替え/プロジェクト・セクション操作はオフライン中に操作できないことを確認する。
