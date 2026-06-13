@@ -71,20 +71,29 @@ todos.get("/", async (c) => {
   });
 });
 
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
 // POST /todos
 todos.post("/", async (c) => {
-  const body = await c.req.json<{ title: string }>();
+  const body = await c.req.json<{ title: string; date?: string }>();
   if (!body.title || body.title.trim() === "") {
     return c.json({ error: "title is required" }, 400);
   }
 
-  const todayStr = today();
+  const targetDate = body.date ?? today();
+  if (!datePattern.test(targetDate)) {
+    return c.json({ error: "date must be YYYY-MM-DD" }, 400);
+  }
+  if (!isEditable(targetDate)) {
+    return c.json({ error: "Cannot create tasks outside editable date range" }, 403);
+  }
+
   const id = crypto.randomUUID();
 
   // 現在の最大 position を取得
   const max = await c.env.DB
     .prepare("SELECT MAX(position) as max_pos FROM todos WHERE date = ?")
-    .bind(todayStr)
+    .bind(targetDate)
     .first<{ max_pos: number | null }>();
   const position = (max?.max_pos ?? -1) + 1;
 
@@ -92,7 +101,7 @@ todos.post("/", async (c) => {
     .prepare(
       "INSERT INTO todos (id, title, date, position) VALUES (?, ?, ?, ?)"
     )
-    .bind(id, body.title.trim(), todayStr, position)
+    .bind(id, body.title.trim(), targetDate, position)
     .run();
 
   const todo = await c.env.DB
@@ -198,18 +207,40 @@ todos.delete("/:id", async (c) => {
 todos.patch("/", async (c) => {
   const body = await c.req.json<{
     items: { id: string; position: number }[];
+    date?: string;
   }>();
 
   if (!body.items || body.items.length === 0) {
     return c.json({ error: "items is required" }, 400);
   }
+  const ids = body.items.map((item) => item.id);
+  if (new Set(ids).size !== ids.length) {
+    return c.json({ error: "duplicate ids are not allowed" }, 400);
+  }
+  const targetDate = body.date ?? today();
+  if (!datePattern.test(targetDate)) {
+    return c.json({ error: "date must be YYYY-MM-DD" }, 400);
+  }
+  if (!isEditable(targetDate)) {
+    return c.json({ error: "Cannot reorder tasks outside editable date range" }, 403);
+  }
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const matching = await c.env.DB
+    .prepare(
+      `SELECT COUNT(*) as count FROM todos WHERE date = ? AND id IN (${placeholders})`
+    )
+    .bind(targetDate, ...ids)
+    .first<{ count: number }>();
+  if ((matching?.count ?? 0) !== ids.length) {
+    return c.json({ error: "Some items do not belong to the target date" }, 409);
+  }
 
   const stmt = c.env.DB.prepare(
     "UPDATE todos SET position = ?, updated_at = datetime('now') WHERE id = ? AND date = ?"
   );
-  const todayStr = today();
   const batch = body.items.map((item) =>
-    stmt.bind(item.position, item.id, todayStr)
+    stmt.bind(item.position, item.id, targetDate)
   );
   await c.env.DB.batch(batch);
 

@@ -23,5 +23,6 @@ export function daysAgo(date: string): number {
 }
 
 export function isEditable(date: string): boolean {
-  return daysAgo(date) <= 1;
+  const age = daysAgo(date);
+  return age >= 0 && age <= 1;
 }

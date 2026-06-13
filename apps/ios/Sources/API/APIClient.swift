@@ -39,8 +39,12 @@ actor APIClient {
         return try decoder.decode(TodosResponse.self, from: data)
     }
 
-    func createTodo(title: String) async throws -> Todo {
-        let data = try await request("/todos", method: "POST", body: ["title": title])
+    func createTodo(title: String, date: String? = nil) async throws -> Todo {
+        var body: [String: AnyCodable] = ["title": AnyCodable(title)]
+        if let date {
+            body["date"] = AnyCodable(date)
+        }
+        let data = try await request("/todos", method: "POST", body: body)
         return try decoder.decode(Todo.self, from: data)
     }
 
@@ -56,8 +60,11 @@ actor APIClient {
         _ = try await request("/todos/\(id)", method: "DELETE")
     }
 
-    func reorderTodos(items: [(id: String, position: Int)]) async throws {
-        let body = ReorderRequest(items: items.map { ReorderItem(id: $0.id, position: $0.position) })
+    func reorderTodos(items: [(id: String, position: Int)], date: String? = nil) async throws {
+        let body = ReorderRequest(
+            items: items.map { ReorderItem(id: $0.id, position: $0.position) },
+            date: date
+        )
         _ = try await request("/todos", method: "PATCH", body: body)
     }
 }
@@ -99,6 +106,7 @@ struct AnyCodable: Codable {
 
 struct ReorderRequest: Codable {
     let items: [ReorderItem]
+    let date: String?
 }
 
 struct ReorderItem: Codable {

@@ -20,6 +20,29 @@ final class TodoViewModel {
     private var lastSeenDate: Date = .now
     private var modelContext: ModelContext?
 
+    private static let retryableURLErrorCodes: Set<URLError.Code> = [
+        .timedOut,
+        .cannotFindHost,
+        .cannotConnectToHost,
+        .networkConnectionLost,
+        .dnsLookupFailed,
+        .notConnectedToInternet,
+        .internationalRoamingOff,
+        .callIsActive,
+        .dataNotAllowed,
+    ]
+
+    private static func isNetworkError(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            return retryableURLErrorCodes.contains(urlError.code)
+        }
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return retryableURLErrorCodes.contains(URLError.Code(rawValue: nsError.code))
+        }
+        return false
+    }
+
     var dateString: String {
         formatDate(currentDate)
     }
@@ -65,15 +88,19 @@ final class TodoViewModel {
     }
 
     func loadTodos() async {
-        isLoading = true
         let date = dateString
+        let cached = loadFromCache(date: date)
+
+        if let cached {
+            applyCached(cached, online: monitor.isOnline)
+            isLoading = false
+        } else {
+            isLoading = true
+        }
 
         // オンラインなら先にキューを掃き出してからサーバ取得（取得結果に同期済み内容が反映される）
         if monitor.isOnline {
             await SyncEngine.shared.sync()
-        }
-
-        if monitor.isOnline {
             do {
                 let response = try await api.fetchTodos(date: date)
                 todos = response.todos
@@ -85,25 +112,42 @@ final class TodoViewModel {
                 isLoading = false
                 return
             } catch {
-                // フォールスルーしてキャッシュを読む
-                self.error = error.localizedDescription
+                if Self.isNetworkError(error) {
+                    if cached == nil {
+                        applyEmptyOfflineState()
+                    } else {
+                        isOffline = true
+                        self.error = nil
+                    }
+                } else {
+                    self.error = error.localizedDescription
+                }
+                isLoading = false
+                return
             }
         }
 
-        if let cached = loadFromCache(date: date) {
-            todos = cached.todos
-            // オフライン時の編集はサーバ整合のため今日のみ許可
-            editable = monitor.isOnline ? cached.editable : (cached.editable && isToday)
-            isOffline = !monitor.isOnline
-            if !monitor.isOnline { error = nil }
-        } else {
-            todos = []
-            // キャッシュ無しでも、今日に限ってはオフラインで書き込みを許可
-            editable = isToday
-            isOffline = !monitor.isOnline
-            if !monitor.isOnline { error = nil }
+        if let cached {
+            applyCached(cached, online: false)
+        } else if !monitor.isOnline {
+            applyEmptyOfflineState()
         }
         isLoading = false
+    }
+
+    private func applyCached(_ cached: (todos: [Todo], editable: Bool), online: Bool) {
+        todos = cached.todos
+        editable = online ? cached.editable : (cached.editable && isToday)
+        isOffline = !online
+        if !online { error = nil }
+    }
+
+    private func applyEmptyOfflineState() {
+        todos = []
+        // キャッシュ無しでも、今日に限ってはオフラインで書き込みを許可
+        editable = isToday
+        isOffline = true
+        error = nil
     }
 
     func addTodo() async {
@@ -119,13 +163,21 @@ final class TodoViewModel {
                 reloadWidget()
                 return
             } catch {
-                self.error = error.localizedDescription
+                if Self.isNetworkError(error), isToday {
+                    addOfflineTodo(title: title)
+                } else {
+                    self.error = error.localizedDescription
+                }
                 return
             }
         }
 
         // オフライン: 今日のみ追加可
         guard isToday else { return }
+        addOfflineTodo(title: title)
+    }
+
+    private func addOfflineTodo(title: String) {
         let tempId = "tmp_\(UUID().uuidString)"
         let now = ISO8601DateFormatter().string(from: .now)
         let nextPosition = (todos.map { $0.position }.max() ?? -1) + 1
@@ -152,6 +204,13 @@ final class TodoViewModel {
         let original = todos[i]
         todos[i].completed = newValue
 
+        if todo.id.hasPrefix("tmp_") {
+            upsertCache(todos[i])
+            enqueue(.update, todoId: todo.id, date: dateString, completed: newValue)
+            reloadWidget()
+            return
+        }
+
         if monitor.isOnline {
             do {
                 let updated = try await api.updateTodo(id: todo.id, completed: newValue)
@@ -162,11 +221,19 @@ final class TodoViewModel {
                 reloadWidget()
                 return
             } catch {
-                if let j = todos.firstIndex(where: { $0.id == todo.id }) {
-                    todos[j] = original
+                if Self.isNetworkError(error), isToday,
+                   let j = todos.firstIndex(where: { $0.id == todo.id }) {
+                    upsertCache(todos[j])
+                    enqueue(.update, todoId: todo.id, date: dateString, completed: newValue)
+                    reloadWidget()
+                    return
+                } else {
+                    if let j = todos.firstIndex(where: { $0.id == todo.id }) {
+                        todos[j] = original
+                    }
+                    self.error = error.localizedDescription
+                    return
                 }
-                self.error = error.localizedDescription
-                return
             }
         }
 
@@ -185,6 +252,13 @@ final class TodoViewModel {
         let original = todos[i]
         todos[i].title = title
 
+        if id.hasPrefix("tmp_") {
+            upsertCache(todos[i])
+            enqueue(.update, todoId: id, date: dateString, title: title)
+            reloadWidget()
+            return
+        }
+
         if monitor.isOnline {
             do {
                 let updated = try await api.updateTodo(id: id, title: title)
@@ -195,11 +269,19 @@ final class TodoViewModel {
                 reloadWidget()
                 return
             } catch {
-                if let j = todos.firstIndex(where: { $0.id == id }) {
-                    todos[j] = original
+                if Self.isNetworkError(error), isToday,
+                   let j = todos.firstIndex(where: { $0.id == id }) {
+                    upsertCache(todos[j])
+                    enqueue(.update, todoId: id, date: dateString, title: title)
+                    reloadWidget()
+                    return
+                } else {
+                    if let j = todos.firstIndex(where: { $0.id == id }) {
+                        todos[j] = original
+                    }
+                    self.error = error.localizedDescription
+                    return
                 }
-                self.error = error.localizedDescription
-                return
             }
         }
 
@@ -215,6 +297,14 @@ final class TodoViewModel {
     func deleteTodo(_ todo: Todo) async {
         guard editable else { return }
 
+        if todo.id.hasPrefix("tmp_") {
+            todos.removeAll { $0.id == todo.id }
+            removeFromCache(id: todo.id)
+            enqueue(.delete, todoId: todo.id, date: dateString)
+            reloadWidget()
+            return
+        }
+
         if monitor.isOnline {
             do {
                 try await api.deleteTodo(id: todo.id)
@@ -223,7 +313,14 @@ final class TodoViewModel {
                 reloadWidget()
                 return
             } catch {
-                self.error = error.localizedDescription
+                if Self.isNetworkError(error), isToday {
+                    todos.removeAll { $0.id == todo.id }
+                    removeFromCache(id: todo.id)
+                    enqueue(.delete, todoId: todo.id, date: dateString)
+                    reloadWidget()
+                } else {
+                    self.error = error.localizedDescription
+                }
                 return
             }
         }
@@ -254,15 +351,17 @@ final class TodoViewModel {
                 (id: todo.id, position: i)
             }
 
-            if monitor.isOnline {
+            if monitor.isOnline && !items.contains(where: { $0.id.hasPrefix("tmp_") }) {
                 do {
-                    try await api.reorderTodos(items: items)
+                    try await api.reorderTodos(items: items, date: dateString)
                     applyReorderToCache(items: items)
                     reloadWidget()
                     return
                 } catch {
-                    self.error = error.localizedDescription
-                    return
+                    if !Self.isNetworkError(error) || !isToday {
+                        self.error = error.localizedDescription
+                        return
+                    }
                 }
             }
 
@@ -418,6 +517,16 @@ final class TodoViewModel {
                     context.delete(op)
                 }
             }
+            if isEmptyReorderPayload(reorderItemsJSON) {
+                try? context.save()
+                SyncEngine.shared.setContext(context)
+                return
+            }
+        }
+        if kind == .delete, let todoId, todoId.hasPrefix("tmp_") {
+            cancelPendingCreate(for: todoId, in: context)
+            SyncEngine.shared.setContext(context)
+            return
         }
         let op = PendingOperation(
             kind: kind,
@@ -430,5 +539,54 @@ final class TodoViewModel {
         context.insert(op)
         try? context.save()
         SyncEngine.shared.setContext(context)
+    }
+
+    private func cancelPendingCreate(for tempId: String, in context: ModelContext) {
+        let createKind = PendingOperationKind.create.rawValue
+        let updateKind = PendingOperationKind.update.rawValue
+        let deleteDescriptor = FetchDescriptor<PendingOperation>(
+            predicate: #Predicate {
+                ($0.kind == createKind || $0.kind == updateKind) && $0.todoId == tempId
+            }
+        )
+        if let ops = try? context.fetch(deleteDescriptor) {
+            for op in ops {
+                context.delete(op)
+            }
+        }
+
+        let reorderKind = PendingOperationKind.reorder.rawValue
+        let reorderDescriptor = FetchDescriptor<PendingOperation>(
+            predicate: #Predicate { $0.kind == reorderKind }
+        )
+        if let reorderOps = try? context.fetch(reorderDescriptor) {
+            for op in reorderOps {
+                guard let json = op.reorderItemsJSON,
+                      let data = json.data(using: .utf8),
+                      var items = try? JSONDecoder().decode([ReorderItemPayload].self, from: data) else { continue }
+                items = items
+                    .filter { $0.id != tempId }
+                    .sorted { $0.position < $1.position }
+                    .enumerated()
+                    .map { ReorderItemPayload(id: $0.element.id, position: $0.offset) }
+                if items.isEmpty {
+                    context.delete(op)
+                } else {
+                    op.reorderItemsJSON = (try? JSONEncoder().encode(items))
+                        .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                }
+            }
+        }
+
+        try? context.save()
+    }
+
+    private func isEmptyReorderPayload(_ json: String?) -> Bool {
+        guard let json,
+              let data = json.data(using: .utf8),
+              let items = try? JSONDecoder().decode([ReorderItemPayload].self, from: data) else {
+            return false
+        }
+        return items.isEmpty
     }
 }

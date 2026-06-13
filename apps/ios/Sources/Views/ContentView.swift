@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TodoViewModel()
     @State private var monitor = NetworkMonitor.shared
+    @State private var syncEngine = SyncEngine.shared
     @FocusState private var isInputFocused: Bool
     @State private var draggingTodoId: String?
     @State private var editingTodoId: String?
@@ -20,6 +21,11 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerView
+            OfflineBanner(
+                isOnline: monitor.isOnline,
+                pendingCount: syncEngine.pendingCount,
+                syncError: syncEngine.lastSyncError
+            )
             todoListView
         }
         .background(colors.panelBackground)

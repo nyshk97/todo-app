@@ -3,6 +3,7 @@ import { Miniflare } from "miniflare";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
+import { yesterday } from "../date";
 
 let mf: Miniflare;
 
@@ -19,11 +20,11 @@ function buildWorker(): string {
   return outfile;
 }
 
-async function createTodo(title: string) {
+async function createTodo(title: string, date?: string) {
   const res = await mf.dispatchFetch("http://localhost/todos", {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(date ? { title, date } : { title }),
   });
   return res.json() as Promise<Record<string, unknown>>;
 }
@@ -42,6 +43,12 @@ async function getTodos(date?: string) {
 
 async function getDb() {
   return await mf.getD1Database("DB");
+}
+
+function jstDaysFromToday(offset: number): string {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  jst.setUTCDate(jst.getUTCDate() + offset);
+  return jst.toISOString().slice(0, 10);
 }
 
 describe("API", () => {
@@ -114,6 +121,17 @@ describe("API", () => {
       expect(t2.position).toBe(1);
     });
 
+    it("指定した編集可能日付にタスクを追加できる", async () => {
+      const dateStr = yesterday();
+
+      const todo = await createTodo("昨日の追加", dateStr);
+      expect(todo.date).toBe(dateStr);
+
+      const data = await getTodos(dateStr);
+      expect(data.todos).toHaveLength(1);
+      expect(data.todos[0].title).toBe("昨日の追加");
+    });
+
     it("完了に更新できる", async () => {
       const todo = await createTodo("タスク");
       const res = await mf.dispatchFetch(
@@ -170,6 +188,46 @@ describe("API", () => {
       const data = await getTodos();
       expect(data.todos.map((t) => t.title)).toEqual(["C", "A", "B"]);
     });
+
+    it("指定した編集可能日付で reorder できる", async () => {
+      const dateStr = yesterday();
+      const t1 = await createTodo("昨日A", dateStr);
+      const t2 = await createTodo("昨日B", dateStr);
+
+      await mf.dispatchFetch("http://localhost/todos", {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          date: dateStr,
+          items: [
+            { id: t2.id, position: 0 },
+            { id: t1.id, position: 1 },
+          ],
+        }),
+      });
+
+      const data = await getTodos(dateStr);
+      expect(data.todos.map((t) => t.title)).toEqual(["昨日B", "昨日A"]);
+    });
+
+    it("指定日のタスクに一致しない ID があれば reorder は 409", async () => {
+      const yesterdayStr = yesterday();
+      const t1 = await createTodo("昨日A", yesterdayStr);
+      const t2 = await createTodo("今日B");
+
+      const res = await mf.dispatchFetch("http://localhost/todos", {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          date: yesterdayStr,
+          items: [
+            { id: t1.id, position: 0 },
+            { id: t2.id, position: 1 },
+          ],
+        }),
+      });
+      expect(res.status).toBe(409);
+    });
   });
 
   describe("日付制限", () => {
@@ -214,6 +272,39 @@ describe("API", () => {
         "http://localhost/todos/old-task-2",
         { method: "DELETE", headers: AUTH }
       );
+      expect(res.status).toBe(403);
+    });
+
+    it("2日以上前の日付には追加できない (403)", async () => {
+      const dateStr = jstDaysFromToday(-2);
+
+      const res = await mf.dispatchFetch("http://localhost/todos", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ title: "古い日付", date: dateStr }),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it("未来日には追加できない (403)", async () => {
+      const res = await mf.dispatchFetch("http://localhost/todos", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ title: "未来日", date: jstDaysFromToday(1) }),
+      });
+      expect(res.status).toBe(403);
+    });
+
+    it("未来日では reorder できない (403)", async () => {
+      const todo = await createTodo("今日のタスク");
+      const res = await mf.dispatchFetch("http://localhost/todos", {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          date: jstDaysFromToday(1),
+          items: [{ id: todo.id, position: 0 }],
+        }),
+      });
       expect(res.status).toBe(403);
     });
 

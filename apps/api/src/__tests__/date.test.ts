@@ -82,5 +82,11 @@ describe("date utilities (JST)", () => {
       vi.setSystemTime(new Date("2026-04-01T10:00:00Z"));
       expect(isEditable("2026-03-30")).toBe(false);
     });
+
+    it("future dates are NOT editable", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-04-01T10:00:00Z"));
+      expect(isEditable("2026-04-02")).toBe(false);
+    });
   });
 });
