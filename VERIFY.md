@@ -3,6 +3,7 @@
 ## API
 
 - テスト実行: `cd apps/api && npm test`
+- API deploy 後の本番 smoke: `apps/ios/.env` の `API_SECRET` を使い、未来日への `POST /todos` が `403` を返すことを確認する。future date は DB に作成されないため副作用がない。`.dev.vars` は production secret と一致しないことがある。
 
 ## iOS アプリ
 

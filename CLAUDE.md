@@ -27,6 +27,7 @@
 - `LazyVStack` で同じ ID を複数の `ForEach` で使うとキャッシュバグが起きる。完了済みタスクには `.id("done-\(todo.id)")` で回避
 - `contextMenu` は dimming バグがあるので使わない。タスク名タップで編集、ゴミ箱アイコンで即削除
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
+- iOS の `PendingOperation` 同期では、同期開始時に fetch した配列 snapshot を最後まで回さない。同期中に ViewModel 側で op が削除・相殺される race があるため、各 iteration で次の pending op を SwiftData から取り直す。HTTP 400/403/409 など再試行で解消しない op は先頭で詰まらせず、ユーザーに見える同期エラーを残して drop する
 - 実機インストール: `mise run build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Xcode の Devices and Simulators に .ipa をドラッグしてインストール。Cmd+R (Debug) だと Development profile が使われ約1週間で期限切れになるため Ad Hoc export を使うこと
 - `GENERATE_INFOPLIST_FILE: true` と `info:` (path なし) は XcodeGen で併用不可。カスタム値は `Secrets.swift` の自動生成で対応
 - XcodeGen で新規ファイルを追加すると SourceKit が一時的に偽陽性エラー（`Cannot find type X in scope` 等）を出すが、これは `.xcodeproj` 未再生成によるもの。`bash scripts/generate-projects.sh` 後に解消する。多数表示されてもひるまず、最後に `xcodebuild ... -sdk iphonesimulator build` で実ビルドして確認する
