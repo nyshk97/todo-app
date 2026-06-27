@@ -97,11 +97,10 @@ function Shell() {
 
   const handleTaskDelete = async (id: string) => {
     setSelectedTask(null);
-    setRefreshKey((k) => k + 1);
     try {
       await api.delete(`/tasks/${id}`);
-    } catch {
       setRefreshKey((k) => k + 1);
+    } catch {
       showToast("タスクの削除に失敗しました", () => handleTaskDelete(id));
     }
   };
