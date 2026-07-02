@@ -25,6 +25,18 @@
 - D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと
 - 日付は JST (UTC+9) で計算
 
+## 通信遅延の調査手順
+
+「時々 API 通信が数秒かかる」報告あり（2026-07 時点で原因未特定。正常時は Shelf API・todo-app API とも 40〜180ms）。計測ログ仕込み済み:
+
+- **クライアント側の記録**: 1秒超 or 失敗したリクエストを localStorage `slow-requests`（直近50件）と console `[slow-request]` に記録している（`apps/web/src/lib/api.ts`。todo-app への移動 POST も App.tsx で記録対象）。devtools console で `JSON.parse(localStorage.getItem("slow-requests"))` で確認
+- **サーバー側の記録**: 全リクエストの所要時間を `{"method","path","status","ms"}` の JSON で console.log している（`apps/api/src/index.ts` のミドルウェア）。Workers Logs 有効化済み（wrangler.toml の `[observability]`）なので Cloudflare ダッシュボード → Workers & Pages → todo-shelf-api → Logs で過去分（無料プランで3日保持）を検索できる。リアルタイム監視は `npx wrangler tail todo-shelf-api`
+- **切り分け**: localStorage に記録あり＋サーバーログの ms が小さい → ネットワーク経路。両方大きい → サーバー側（D1 レイテンシスパイク等）。localStorage に記録がないのに遅く感じた → フロント実装起因（下記）
+- **フロントの既知の「遅く見える」要因**（未修正）:
+  - 「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）
+  - 詳細モーダルからの削除は DELETE 送信前に refreshKey を上げるため、リスト再取得と DELETE がレースして削除したタスクが次のフォーカス時まで残ることがある（`App.tsx` handleTaskDelete）
+  - refreshKey 変更のたびに ProjectView が key ごと再マウントされ「読み込み中...」からフル再取得になる（`App.tsx`）
+
 ## シークレット・バインディング
 
 ### API（Cloudflare Workers）

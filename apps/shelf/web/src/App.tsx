@@ -8,7 +8,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import type { Project, Task, Section, UpcomingTask } from "@todo-shelf/shared";
-import { api } from "./lib/api";
+import { api, recordSlowRequest } from "./lib/api";
 import { Header } from "./components/Header";
 import { Fab } from "./components/Fab";
 import { ProjectView } from "./components/ProjectView";
@@ -112,19 +112,42 @@ function Shell() {
     const todoAppUrl = import.meta.env.VITE_TODO_APP_API_URL ?? "http://localhost:8788";
     const todoAppSecret = import.meta.env.VITE_API_SECRET ?? "";
     const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const res = await fetch(`${todoAppUrl}/todos`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${todoAppSecret}`,
-      },
-      body: JSON.stringify({
-        title: task.section_id
-          ? `[${allSections.find((s) => s.id === task.section_id)?.name}] ${task.title}`
-          : task.title,
-        date: today,
-      }),
-    });
+    const start = performance.now();
+    let res: Response;
+    try {
+      res = await fetch(`${todoAppUrl}/todos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${todoAppSecret}`,
+        },
+        body: JSON.stringify({
+          title: task.section_id
+            ? `[${allSections.find((s) => s.id === task.section_id)?.name}] ${task.title}`
+            : task.title,
+          date: today,
+        }),
+      });
+    } catch (e) {
+      recordSlowRequest({
+        at: new Date().toISOString(),
+        method: "POST",
+        path: "todo-app:/todos",
+        ms: Math.round(performance.now() - start),
+        status: "network-error",
+      });
+      throw e;
+    }
+    const ms = Math.round(performance.now() - start);
+    if (ms > 1000) {
+      recordSlowRequest({
+        at: new Date().toISOString(),
+        method: "POST",
+        path: "todo-app:/todos",
+        ms,
+        status: res.status,
+      });
+    }
     if (!res.ok) {
       throw new Error("Failed to create todo in todo-app");
     }

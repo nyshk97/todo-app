@@ -12,6 +12,21 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("*", cors());
 
+// リクエストごとの所要時間ログ（Workers Logs で遅延調査に使う）
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  console.log(
+    JSON.stringify({
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      status: c.res.status,
+      ms,
+    })
+  );
+});
+
 app.get("/", (c) => c.json({ status: "ok" }));
 
 app.use("/projects/*", auth);
