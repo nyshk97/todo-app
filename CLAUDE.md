@@ -34,8 +34,8 @@
 - **切り分け**: localStorage に記録あり＋サーバーログの ms が小さい → ネットワーク経路。両方大きい → サーバー側（D1 レイテンシスパイク等）。localStorage に記録がないのに遅く感じた → フロント実装起因（下記）
 - **フロントの既知の「遅く見える」要因**（未修正）:
   - 「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）
-  - 詳細モーダルからの削除は DELETE 送信前に refreshKey を上げるため、リスト再取得と DELETE がレースして削除したタスクが次のフォーカス時まで残ることがある（`App.tsx` handleTaskDelete）
   - refreshKey 変更のたびに ProjectView が key ごと再マウントされ「読み込み中...」からフル再取得になる（`App.tsx`）
+  - 詳細モーダルからの削除が DELETE 送信前に refreshKey を上げて再取得とレースする問題は 175cb45 で修正済み（DELETE 成功後に再取得）
 
 ## シークレット・バインディング
 
