@@ -108,7 +108,6 @@ struct TaskListView: View {
     @State private var newTaskTitle = ""
     @State private var isAdding = false
     @FocusState private var isTextFieldFocused: Bool
-    @GestureState private var pickedUpTaskId: String?
 
     private var isDropTarget: Bool {
         dragController.isActive && dragController.currentDropTarget?.sectionId == sectionId
@@ -132,11 +131,6 @@ struct TaskListView: View {
                     task: task,
                     isPending: viewModel.pendingTaskIds.contains(task.id),
                     onTap: { onSelect(task) }
-                )
-                .background(
-                    (pickedUpTaskId == task.id && !dragController.isActive)
-                        ? Theme.accentBright.opacity(0.12)
-                        : Color.clear
                 )
                 .opacity(dragController.draggingTaskId == task.id ? 0.3 : 1.0)
                 .overlay(alignment: .top) {
@@ -164,7 +158,6 @@ struct TaskListView: View {
                         )
                     }
                 )
-                .simultaneousGesture(dragGesture(for: task))
             }
 
             // Add task
@@ -223,90 +216,6 @@ struct TaskListView: View {
             }
         } else {
             Color.clear
-        }
-    }
-
-    private func dragGesture(for task: Task) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.4)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("project")))
-            .updating($pickedUpTaskId) { value, state, _ in
-                switch value {
-                case .first(true), .second(true, _):
-                    state = task.id
-                default:
-                    state = nil
-                }
-            }
-            .onChanged { value in
-                switch value {
-                case .first(true):
-                    break
-                case .second(true, let dragValue):
-                    guard let dragValue else { return }
-                    if !dragController.isActive {
-                        guard let frame = dragController.taskFrames[task.id]?.frame else { return }
-                        let touchOffset = CGSize(
-                            width: dragValue.startLocation.x - frame.minX,
-                            height: dragValue.startLocation.y - frame.minY
-                        )
-                        dragController.startDrag(
-                            taskId: task.id,
-                            projectId: projectId,
-                            sourceSectionId: sectionId,
-                            touchOffset: touchOffset,
-                            ghostSize: frame.size,
-                            initialLocation: dragValue.location
-                        )
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    } else {
-                        dragController.updateLocation(dragValue.location)
-                    }
-                default:
-                    break
-                }
-            }
-            .onEnded { _ in
-                let result = dragController.endDrag()
-                guard let result else { return }
-                applyDrop(result: result)
-            }
-    }
-
-    private func applyDrop(result: DragController.DropResult) {
-        let target = result.target
-
-        if target.sectionId == result.sourceSectionId {
-            // Same section — reorder
-            let sectionTasks = viewModel.tasksFor(projectId: projectId, sectionId: target.sectionId)
-            var taskIds = sectionTasks.map(\.id)
-            guard let currentIndex = taskIds.firstIndex(of: result.taskId) else { return }
-
-            taskIds.remove(at: currentIndex)
-            var insertionIndex = target.insertionIndex
-            if currentIndex < insertionIndex {
-                insertionIndex -= 1
-            }
-            insertionIndex = max(0, min(insertionIndex, taskIds.count))
-            taskIds.insert(result.taskId, at: insertionIndex)
-
-            let originalIds = sectionTasks.map(\.id)
-            guard taskIds != originalIds else { return }
-
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            Swift.Task {
-                await viewModel.reorderTasks(projectId: projectId, sectionId: target.sectionId, taskIds: taskIds)
-            }
-        } else {
-            // Cross-section move
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            Swift.Task {
-                await viewModel.moveTaskToSection(
-                    taskId: result.taskId,
-                    projectId: projectId,
-                    toSectionId: target.sectionId,
-                    insertAt: target.insertionIndex
-                )
-            }
         }
     }
 

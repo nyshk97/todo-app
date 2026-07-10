@@ -76,6 +76,25 @@ xcodebuild -project Shelf.xcodeproj -scheme Shelf \
 - 末尾が `** BUILD SUCCEEDED **` なら pass
 - 警告抽出: `... 2>&1 | grep -E "(warning:|error:)" | grep -v AppIntents.framework`
 - `AppIntents.framework` 関連 warning は AppIntents 未使用のため無視
+- `xcode-select` が CommandLineTools を向いていて `requires Xcode` エラーが出る場合は `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` を付ける
+
+### シミュレータでの起動・UI 確認
+
+UI 変更後、実機ビルドを依頼する前にシミュレータで起動と画面表示を確認する。
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+UDID=$(xcrun simctl list devices available | grep "iPhone 17 (" | grep -oE '[0-9A-F-]{36}')
+xcrun simctl boot $UDID; xcrun simctl bootstatus $UDID -b
+xcrun simctl install $UDID ~/Library/Developer/Xcode/DerivedData/Shelf-*/Build/Products/Debug-iphonesimulator/Shelf.app
+xcrun simctl launch $UDID com.d0ne1s.shelf
+sleep 4 && xcrun simctl io $UDID screenshot /tmp/shelf.png  # 起動画面を目視
+```
+
+- スクリーンショットにタスク一覧が表示されていれば pass（クラッシュ・空画面なら fail）
+- ログを見たい場合は `launch` を `xcrun simctl launch --console-pty $UDID com.d0ne1s.shelf > app.log 2>&1 &` に置き換える
+- **注意**: シミュレータのアプリも本番 API に接続する。検証操作はデータ変更を伴わないものに留める（タップで詳細を開く、同位置ドロップ等）
+- タッチ合成が必要なジェスチャー検証はグローバル CLAUDE.md の「iOS Simulator へのタッチ合成」を参照
 
 ### オフライン回帰確認
 

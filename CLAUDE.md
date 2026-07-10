@@ -80,7 +80,7 @@
 
 ## iOS
 
-- SwiftUI 標準の `.onDrag`/`.onDrop` はセクション間 D&D に不向き（アニメーション制御の限界、スクロールとの競合）。カスタム D&D は `LongPressGesture.sequenced(before: DragGesture)` + `PreferenceKey` で frame 収集 + `UIScrollView` introspection でオートスクロール、という構成で実装している（`DragController.swift` 参照）
+- SwiftUI 標準の `.onDrag`/`.onDrop` はセクション間 D&D に不向き（アニメーション制御の限界、スクロールとの競合）。また SwiftUI の `LongPressGesture.sequenced(before: DragGesture)` を行に付ける方式は、行上で始まったタッチをジェスチャーが主張して ScrollView のスクロールをブロックする（タスクが画面を埋めるとスクロール不能になる）。現行実装は **UIScrollView に `UILongPressGestureRecognizer` を1本付けて D&D を駆動**（`TaskDragRecognizer.swift`）+ `PreferenceKey` で frame 収集 + オートスクロール（`DragController.swift`）という構成。UIKit の長押しはスクロールのパンと failure requirement で自然に調停される（指が動けばスクロール、止まればドラッグ）。タッチ座標は "project" named coordinate space の view の background に置いた anchor UIView 経由で変換し、`shouldReceive` でタスク行の上のタッチだけ受ける（セクションヘッダーの contextMenu と競合させないため）
 - カスタムジェスチャーを付ける View は `Button` を避けて `HStack + .onTapGesture` にする。`Button` + 外側 gesture は `.simultaneousGesture`（両発火）/ `.gesture`（Button 常勝）/ `.highPriorityGesture`（外側常勝）のどれも破綻する
 - ジェスチャーに紐づく一時状態は `@GestureState` を使うとキャンセル時も自動リセットされる。手動管理の `@State` フラグは `.onEnded` が呼ばれない経路で汚染されるリスクあり
 - 新規 Swift ファイルを追加したら `xcodegen generate` を再実行してからビルドする（自動では Xcode プロジェクトに含まれない）

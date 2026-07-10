@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ProjectView: View {
     let viewModel: ShelfViewModel
@@ -98,9 +99,11 @@ struct ProjectView: View {
             }
             .padding(.bottom, 80)
             .coordinateSpace(name: "project")
-            .background(ScrollViewFinder { scrollView in
-                dragController.scrollView = scrollView
-            })
+            .background(TaskDragRecognizer(
+                dragController: dragController,
+                projectId: projectId,
+                onDrop: { applyDrop(result: $0) }
+            ))
             .onPreferenceChange(SectionFramesPreferenceKey.self) { value in
                 dragController.sectionFrames = value
             }
@@ -131,6 +134,44 @@ struct ProjectView: View {
         }
         .sheet(isPresented: $showReorderSections) {
             SectionReorderSheet(viewModel: viewModel, projectId: projectId)
+        }
+    }
+
+    private func applyDrop(result: DragController.DropResult) {
+        let target = result.target
+
+        if target.sectionId == result.sourceSectionId {
+            // Same section — reorder
+            let sectionTasks = viewModel.tasksFor(projectId: projectId, sectionId: target.sectionId)
+            var taskIds = sectionTasks.map(\.id)
+            guard let currentIndex = taskIds.firstIndex(of: result.taskId) else { return }
+
+            taskIds.remove(at: currentIndex)
+            var insertionIndex = target.insertionIndex
+            if currentIndex < insertionIndex {
+                insertionIndex -= 1
+            }
+            insertionIndex = max(0, min(insertionIndex, taskIds.count))
+            taskIds.insert(result.taskId, at: insertionIndex)
+
+            let originalIds = sectionTasks.map(\.id)
+            guard taskIds != originalIds else { return }
+
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Swift.Task {
+                await viewModel.reorderTasks(projectId: projectId, sectionId: target.sectionId, taskIds: taskIds)
+            }
+        } else {
+            // Cross-section move
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Swift.Task {
+                await viewModel.moveTaskToSection(
+                    taskId: result.taskId,
+                    projectId: projectId,
+                    toSectionId: target.sectionId,
+                    insertAt: target.insertionIndex
+                )
+            }
         }
     }
 
