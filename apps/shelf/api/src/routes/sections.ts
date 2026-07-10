@@ -5,6 +5,14 @@ import type { ReorderRequest } from "@todo-shelf/shared";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+// GET /sections（全プロジェクト横断）
+app.get("/sections", async (c) => {
+  const results = await c.env.DB.prepare(
+    "SELECT * FROM sections ORDER BY project_id, position"
+  ).all();
+  return c.json(results.results);
+});
+
 // GET /projects/:id/sections
 app.get("/projects/:id/sections", async (c) => {
   const projectId = c.req.param("id");

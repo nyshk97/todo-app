@@ -7,6 +7,7 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Project, Task, Section, UpcomingTask } from "@todo-shelf/shared";
 import { api, recordSlowRequest } from "./lib/api";
 import { Header } from "./components/Header";
@@ -29,77 +30,65 @@ function Shell() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [allSections, setAllSections] = useState<Section[]>([]);
-  const [backlogUpcomingCount, setBacklogUpcomingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const { showToast } = useToast();
 
   const isArchive = location.pathname === "/archive";
 
-  const refreshMeta = async (): Promise<Project[]> => {
-    const [ps, upcoming] = await Promise.all([
-      api.get<Project[]>("/projects"),
-      api.get<UpcomingTask[]>("/tasks/upcoming?days=3"),
-    ]);
-    setProjects(ps);
+  // フォーカス時の再取得は TanStack Query の refetchOnWindowFocus（デフォルト有効）に任せる
+  const { data: projects = [], isPending: projectsPending } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.get<Project[]>("/projects"),
+  });
+  const { data: allSections = [] } = useQuery({
+    queryKey: ["sections"],
+    queryFn: () => api.get<Section[]>("/sections"),
+  });
+  const { data: upcoming = [] } = useQuery({
+    queryKey: ["upcoming"],
+    queryFn: () => api.get<UpcomingTask[]>("/tasks/upcoming?days=3"),
+  });
 
-    const backlogProject = ps.find((p) => p.name === "Backlog");
-    setBacklogUpcomingCount(
-      backlogProject
-        ? upcoming.filter((t) => t.project_id === backlogProject.id).length
-        : 0
-    );
+  const backlogProject = projects.find((p) => p.name === "Backlog");
+  const backlogUpcomingCount = backlogProject
+    ? upcoming.filter((t) => t.project_id === backlogProject.id).length
+    : 0;
 
-    const sectionResults = await Promise.all(
-      ps.map((p) => api.get<Section[]>(`/projects/${p.id}/sections`))
-    );
-    setAllSections(sectionResults.flat());
-    return ps;
+  // URL のプロジェクトが不在ならメインプロジェクトへリダイレクト
+  useEffect(() => {
+    if (isArchive || projects.length === 0) return;
+    if (!projectId || !projects.find((p) => p.id === projectId)) {
+      const main = findMainProject(projects);
+      if (main) navigate(`/projects/${main.id}`, { replace: true });
+    }
+  }, [projects, projectId, isArchive, navigate]);
+
+  const invalidateTaskQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["upcoming"] });
   };
-
-  useEffect(() => {
-    (async () => {
-      const ps = await refreshMeta();
-      setLoading(false);
-      if (!isArchive && ps.length > 0 && (!projectId || !ps.find((p) => p.id === projectId))) {
-        const main = findMainProject(ps);
-        if (main) navigate(`/projects/${main.id}`, { replace: true });
-      }
-    })();
-  }, []);
-
-  // Auto-refresh when the tab/window regains focus.
-  useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState !== "visible") return;
-      refreshMeta().catch(() => {});
-      setRefreshKey((k) => k + 1);
-    };
-    document.addEventListener("visibilitychange", handler);
-    window.addEventListener("focus", handler);
-    return () => {
-      document.removeEventListener("visibilitychange", handler);
-      window.removeEventListener("focus", handler);
-    };
-  }, []);
 
   const handleNavigate = (path: string) => {
     navigate(path);
   };
 
+  const handleProjectsChange = (ps: Project[]) => {
+    queryClient.setQueryData(["projects"], ps);
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    queryClient.invalidateQueries({ queryKey: ["sections"] });
+  };
+
   const handleTaskUpdate = (updated: Task) => {
     setSelectedTask(updated);
-    setRefreshKey((k) => k + 1);
+    invalidateTaskQueries();
   };
 
   const handleTaskDelete = async (id: string) => {
     setSelectedTask(null);
     try {
       await api.delete(`/tasks/${id}`);
-      setRefreshKey((k) => k + 1);
+      invalidateTaskQueries();
     } catch {
       showToast("タスクの削除に失敗しました", () => handleTaskDelete(id));
     }
@@ -154,10 +143,12 @@ function Shell() {
 
     await api.post(`/tasks/${id}/move-to-today`, {});
     setSelectedTask(null);
-    setRefreshKey((k) => k + 1);
+    invalidateTaskQueries();
+    queryClient.invalidateQueries({ queryKey: ["archived"] });
   };
 
-  if (loading) {
+  // キャッシュがあれば isPending は false になり、この画面は初回アクセス時のみ表示される
+  if (projectsPending) {
     return (
       <div style={{
         height: "100%",
@@ -211,13 +202,12 @@ function Shell() {
       }}>
         {isArchive ? (
           <ArchiveView
-            key={refreshKey}
             projects={projects}
             sections={allSections}
           />
         ) : projectId ? (
           <ProjectView
-            key={`${projectId}-${refreshKey}`}
+            key={projectId}
             projectId={projectId}
             onClickTask={setSelectedTask}
           />
@@ -237,7 +227,7 @@ function Shell() {
           projects={projects}
           backlogUpcomingCount={backlogUpcomingCount}
           onNavigate={handleNavigate}
-          onProjectsChange={setProjects}
+          onProjectsChange={handleProjectsChange}
         />
       )}
 

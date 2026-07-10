@@ -30,6 +30,7 @@ app.use("*", async (c, next) => {
 app.get("/", (c) => c.json({ status: "ok" }));
 
 app.use("/projects/*", auth);
+app.use("/sections", auth);
 app.use("/sections/*", auth);
 app.use("/tasks/*", auth);
 app.use("/comments/*", auth);

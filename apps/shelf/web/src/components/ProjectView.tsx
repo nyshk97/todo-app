@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   closestCenter,
@@ -181,9 +182,28 @@ const taskAwareCollision: CollisionDetection = (args) => {
 };
 
 export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
-  const [sections, setSections] = useState<Section[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // 取得・キャッシュは query に任せ、操作用の source of truth は local state に置くハイブリッド構成。
+  // 楽観的更新・D&D は local state を直接書き換え、API 成功後の invalidate で query 側と収束させる
+  const { data: allSections } = useQuery({
+    queryKey: ["sections"],
+    queryFn: () => api.get<Section[]>("/sections"),
+  });
+  const { data: tasksData } = useQuery({
+    queryKey: ["tasks", projectId],
+    queryFn: () => api.get<Task[]>(`/projects/${projectId}/tasks`),
+  });
+
+  const sectionsFor = (all: Section[] | undefined) =>
+    (all ?? [])
+      .filter((s) => s.project_id === projectId)
+      .sort((a, b) => a.position - b.position);
+
+  // 初期値はキャッシュから即席込み（親が key={projectId} で remount するので projectId は不変）
+  const [sections, setSections] = useState<Section[]>(() => sectionsFor(allSections));
+  const [tasks, setTasks] = useState<Task[]>(() => tasksData ?? []);
+  const loading = tasksData === undefined || allSections === undefined;
   const [addingSectionName, setAddingSectionName] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
   const dragTypeRef = useRef<"section" | "task" | null>(null);
@@ -193,20 +213,17 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const load = useCallback(async () => {
-    const [s, t] = await Promise.all([
-      api.get<Section[]>(`/projects/${projectId}/sections`),
-      api.get<Task[]>(`/projects/${projectId}/tasks`),
-    ]);
-    setSections(s);
-    setTasks(t);
-    setLoading(false);
-  }, [projectId]);
+  // refetch の結果を local state に反映（ドラッグ中は楽観的状態を上書きしない）
+  useEffect(() => {
+    if (!tasksData || dragTypeRef.current) return;
+    setTasks(tasksData);
+  }, [tasksData]);
 
   useEffect(() => {
-    setLoading(true);
-    load();
-  }, [load]);
+    if (!allSections || dragTypeRef.current) return;
+    setSections(sectionsFor(allSections));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSections]);
 
   const handleAddTask = async (title: string, sectionId: string | null) => {
     const tempId = `temp-${Date.now()}`;
@@ -232,6 +249,7 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         section_id: sectionId,
       });
       setTasks((prev) => prev.map((t) => (t.id === tempId ? task : t)));
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
     } catch {
       setTasks((prev) => prev.filter((t) => t.id !== tempId));
       showToast("タスクの作成に失敗しました", () => handleAddTask(title, sectionId));
@@ -243,6 +261,8 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
       await api.delete(`/tasks/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming"] });
     } catch {
       setTasks(snapshot);
       showToast("タスクの削除に失敗しました", () => handleDeleteTask(id));
@@ -258,11 +278,13 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     setSections((prev) => [...prev, section]);
     setAddingSectionName("");
     setShowAddSection(false);
+    queryClient.invalidateQueries({ queryKey: ["sections"] });
   };
 
   const handleRenameSection = async (id: string, name: string) => {
     const updated = await api.patch<Section>(`/sections/${id}`, { name });
     setSections((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    queryClient.invalidateQueries({ queryKey: ["sections"] });
   };
 
   const handleDeleteSection = async (id: string) => {
@@ -271,6 +293,8 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     setTasks((prev) =>
       prev.map((t) => (t.section_id === id ? { ...t, section_id: null } : t))
     );
+    queryClient.invalidateQueries({ queryKey: ["sections"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
   };
 
   // --- Drag handlers ---
@@ -333,7 +357,10 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
       const reordered = arrayMove(sections, oldIndex, newIndex);
       setSections(reordered);
       const items = reordered.map((s, i) => ({ id: s.id, position: i }));
-      api.patch(`/projects/${projectId}/sections/reorder`, { items });
+      // 書き込み完了前に refetch すると古い並びで上書きされるので、成功後に invalidate する
+      api.patch(`/projects/${projectId}/sections/reorder`, { items }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["sections"] });
+      });
       return;
     }
 
@@ -387,7 +414,9 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         return [...others, ...updated];
       });
 
-      api.patch("/tasks/reorder", { items: reorderItems });
+      api.patch("/tasks/reorder", { items: reorderItems }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      });
     }
   };
 

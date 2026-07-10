@@ -26,6 +26,23 @@ VITE_API_URL=https://todo-shelf-api.d0ne1s-todo.workers.dev npm run dev -- --hos
 - `http://127.0.0.1:5173/` をブラウザで開き、対象 UI を目視確認できれば pass
 - API データが必要な確認では、データ作成や削除を伴わない操作に留める
 
+### キャッシュ層（TanStack Query）の回帰確認
+
+キャッシュまわり（クエリキー、invalidate、persister 設定）を変更したときに確認する。agent-browser で:
+
+```bash
+agent-browser --session verify open http://localhost:5174 && agent-browser --session verify wait --load networkidle
+# 1. localStorage にキャッシュが永続化されているか
+agent-browser --session verify eval 'JSON.parse(localStorage.getItem("todo-shelf-query-cache")).clientState.queries.map(q => q.queryKey)'
+# 2. API を遮断してリロードしてもキャッシュから描画されるか
+agent-browser --session verify network route "http://localhost:8787/**" --abort
+agent-browser --session verify open http://localhost:5174 && agent-browser --session verify wait 1500 && agent-browser --session verify screenshot
+```
+
+- 1 で `["projects"], ["sections"], ["upcoming"], ["tasks", <projectId>]` が出れば pass
+- 2 のスクリーンショットでタスク一覧が表示されていれば pass（「読み込み中...」やエラー表示なら fail）
+- 変更操作（追加・削除・更新）の後は `network requests --type xhr,fetch` で該当クエリの refetch（invalidate）が飛んでいることを確認する
+
 ## iOS
 
 ### コード変更後のビルド検証

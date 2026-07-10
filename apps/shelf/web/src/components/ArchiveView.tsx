@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ArchivedTask, Project, Section } from "@todo-shelf/shared";
 import { api } from "../lib/api";
 import { TaskDetail } from "./TaskDetail";
@@ -9,31 +10,35 @@ interface ArchiveViewProps {
 }
 
 export function ArchiveView({ projects, sections }: ArchiveViewProps) {
-  const [tasks, setTasks] = useState<ArchivedTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["archived"],
+    queryFn: () => api.get<ArchivedTask[]>("/tasks/archived"),
+  });
+  const tasks = data ?? [];
+  const loading = data === undefined;
   const [selectedTask, setSelectedTask] = useState<ArchivedTask | null>(null);
 
-  const loadTasks = async () => {
-    setLoading(true);
-    const data = await api.get<ArchivedTask[]>("/tasks/archived");
-    setTasks(data);
-    setLoading(false);
+  const removeFromList = (id: string) => {
+    queryClient.setQueryData<ArchivedTask[]>(["archived"], (prev) =>
+      prev?.filter((t) => t.id !== id)
+    );
   };
-
-  useEffect(() => {
-    loadTasks();
-  }, []);
 
   const handleRestore = async (id: string) => {
     await api.post(`/tasks/${id}/restore`, {});
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    removeFromList(id);
     setSelectedTask(null);
+    queryClient.invalidateQueries({ queryKey: ["archived"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["upcoming"] });
   };
 
   const handleDelete = async (id: string) => {
     await api.delete(`/tasks/${id}`);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    removeFromList(id);
     setSelectedTask(null);
+    queryClient.invalidateQueries({ queryKey: ["archived"] });
   };
 
   if (loading) {
