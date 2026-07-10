@@ -10,6 +10,8 @@
 
 `.mise.toml` にタスク定義あり。`mise tasks` で一覧表示。
 
+- `mise run test`（apps/api の vitest）は Tasks 系 9 件が main でも失敗する既知の状態（2026-07 時点）。テスト失敗を見たらまず main で再現するか切り分ける
+
 ## デプロイ・ビルド
 
 - API: `mise run deploy`（Cloudflare Workers）
@@ -22,6 +24,7 @@
 - 本番: https://todo-shelf-api.d0ne1s-todo.workers.dev
 - Web: https://todo-shelf-web.pages.dev
 - 認証: `Authorization: Bearer <API_SECRET>`
+- Hono の `app.use("/xxx/*", auth)` は `/xxx`（ワイルドカードなしのベアパス）にマッチしない可能性がある。`GET /sections` のようなコレクション直下ルートを追加するときは `app.use("/xxx", auth)` も併記して認証漏れを防ぐ（index.ts の `/sections` 参照）
 - D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと
 - 日付は JST (UTC+9) で計算
 
@@ -32,10 +35,10 @@
 - **クライアント側の記録**: 1秒超 or 失敗したリクエストを localStorage `slow-requests`（直近50件）と console `[slow-request]` に記録している（`apps/web/src/lib/api.ts`。todo-app への移動 POST も App.tsx で記録対象）。devtools console で `JSON.parse(localStorage.getItem("slow-requests"))` で確認
 - **サーバー側の記録**: 全リクエストの所要時間を `{"method","path","status","ms"}` の JSON で console.log している（`apps/api/src/index.ts` のミドルウェア）。Workers Logs 有効化済み（wrangler.toml の `[observability]`）なので Cloudflare ダッシュボード → Workers & Pages → todo-shelf-api → Logs で過去分（無料プランで3日保持）を検索できる。リアルタイム監視は `npx wrangler tail todo-shelf-api`
 - **切り分け**: localStorage に記録あり＋サーバーログの ms が小さい → ネットワーク経路。両方大きい → サーバー側（D1 レイテンシスパイク等）。localStorage に記録がないのに遅く感じた → フロント実装起因（下記）
-- **フロントの既知の「遅く見える」要因**（未修正）:
-  - 「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）
-  - refreshKey 変更のたびに ProjectView が key ごと再マウントされ「読み込み中...」からフル再取得になる（`App.tsx`）
-  - 詳細モーダルからの削除が DELETE 送信前に refreshKey を上げて再取得とレースする問題は 175cb45 で修正済み（DELETE 成功後に再取得）
+- **フロントの既知の「遅く見える」要因**:
+  - 「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）**（未修正）**
+  - ~~refreshKey 変更のたびに ProjectView が key ごと再マウントされ「読み込み中...」からフル再取得になる~~ → TanStack Query 導入（cd97f92）で解消。起動時もキャッシュから即描画されるため、「開いたとき遅い」体感は今後ネットワーク/サーバー起因に絞られる
+  - 詳細モーダルからの削除が DELETE 送信前に refreshKey を上げて再取得とレースする問題は 175cb45 で修正済み（現在は invalidateQueries ベース）
 
 ## シークレット・バインディング
 
@@ -62,6 +65,12 @@
 
 - コード内で `p.name === "Shelf"`, `"Backlog"`, `"Archive"` などプロジェクト名の完全一致で表示制御している箇所がある（Web: App.tsx, Fab.tsx / iOS: ContentView.swift）
 - プロジェクト名を変更する場合、コード変更 → デプロイ → DB リネームの順で行うか、同時に反映すること
+
+## Web のキャッシュ層（TanStack Query）
+
+- 取得・キャッシュは useQuery（localStorage persister で永続化、キー: `["projects"]` `["sections"]` `["upcoming"]` `["tasks", projectId]` `["archived"]`）、D&D・楽観的更新は ProjectView の local state、というハイブリッド構成。書き込みは **API 成功を await した後に** `invalidateQueries` で収束させる（先に invalidate すると書き込み前の値で refetch されるレースになる）
+- ProjectView は query data → local state を useEffect で同期している。ドラッグ中（`dragTypeRef` 非 null）は同期をスキップして楽観的状態の上書きを防ぐ
+- ESLint の `react-hooks/set-state-in-effect` が「effect 内の同期 setState」を error にする。新しい view では local state を持たず query data 直参照 ＋ `setQueryData` を優先する（ArchiveView 方式）。local state が必要な場合は `useState(() => queryData ?? [])` で初期値をキャッシュから席込み＋親で `key={id}` remount にするとフラッシュも防げる
 
 ## dnd-kit
 
