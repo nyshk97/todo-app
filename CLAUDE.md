@@ -68,6 +68,7 @@
 
 ## Web のキャッシュ層（TanStack Query）
 
+- **放置後の最新化は focus イベント監視＋60秒ポーリングの2段構え**（main.tsx）。v5 の focusManager は `visibilitychange` しか監視せず「ウィンドウが見えたまま別アプリから戻る」「スリープ復帰」を拾えないため、`focusManager.setEventListener` で `focus` イベントも追加登録している。**`handleFocus` は必ず引数なしで呼ぶ**（`handleFocus(true)` だと `setFocused` 経由になり値が変化した初回しか発火しない）。`refetchInterval: 60_000` は visible なタブでのみ動き、フォーカスイベントが発火しないケースのセーフティネット
 - 取得・キャッシュは useQuery（localStorage persister で永続化、キー: `["projects"]` `["sections"]` `["upcoming"]` `["tasks", projectId]` `["archived"]`）、D&D・楽観的更新は ProjectView の local state、というハイブリッド構成。書き込みは **API 成功を await した後に** `invalidateQueries` で収束させる（先に invalidate すると書き込み前の値で refetch されるレースになる）
 - ProjectView は query data → local state を useEffect で同期している。ドラッグ中（`dragTypeRef` 非 null）は同期をスキップして楽観的状態の上書きを防ぐ
 - ESLint の `react-hooks/set-state-in-effect` が「effect 内の同期 setState」を error にする。新しい view では local state を持たず query data 直参照 ＋ `setQueryData` を優先する（ArchiveView 方式）。local state が必要な場合は `useState(() => queryData ?? [])` で初期値をキャッシュから席込み＋親で `key={id}` remount にするとフラッシュも防げる

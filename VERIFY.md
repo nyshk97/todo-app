@@ -43,6 +43,22 @@ agent-browser --session verify open http://localhost:5174 && agent-browser --ses
 - 2 のスクリーンショットでタスク一覧が表示されていれば pass（「読み込み中...」やエラー表示なら fail）
 - 変更操作（追加・削除・更新）の後は `network requests --type xhr,fetch` で該当クエリの refetch（invalidate）が飛んでいることを確認する
 
+### フォーカス復帰時・定期の再取得（focusManager / refetchInterval）
+
+フォーカス再取得やポーリング設定（main.tsx）を変更したときに確認する。API リクエストの発生時刻は Performance API で取る:
+
+```bash
+# focus イベントを合成して再取得が飛ぶか（staleTime 30秒を超えてから実行すること）
+agent-browser --session verify eval 'window.dispatchEvent(new Event("focus")); "dispatched at " + Math.round(performance.now())'
+agent-browser --session verify wait 2000
+agent-browser --session verify eval 'JSON.stringify(performance.getEntriesByType("resource").filter(e => e.name.includes("localhost:8787")).map(e => Math.round(e.startTime)))'
+```
+
+- dispatch 時刻と同時刻の API リクエスト群が増えていれば pass
+- **1回目だけでなく、2回目の focus 合成でも再取得されることを必ず確認する**（`handleFocus(true)` と boolean を渡す実装ミスだと初回しか効かず、1回の確認ではすり抜ける）
+- 前回取得から 30 秒以内の focus では再取得されないこと（staleTime 尊重）も正常挙動
+- refetchInterval のポーリングは resource entries が約 60 秒間隔で増えることで確認できる。interval タイマーは focus 再取得のたびにリセットされるので、focus 検証は「直前の取得時刻 + 30秒 〜 + 60秒」の窓を狙う
+
 ## iOS
 
 ### コード変更後のビルド検証
