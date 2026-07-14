@@ -37,15 +37,13 @@ struct ProjectView: View {
                 .padding(.bottom, 20)
 
                 // Unsectioned tasks
-                if !unsectionedTasks.isEmpty {
-                    TaskListView(
-                        viewModel: viewModel,
-                        tasks: unsectionedTasks,
-                        projectId: projectId,
-                        sectionId: nil,
-                        onSelect: { selectedTask = $0 }
-                    )
-                }
+                TaskListView(
+                    viewModel: viewModel,
+                    tasks: unsectionedTasks,
+                    projectId: projectId,
+                    sectionId: nil,
+                    onSelect: { selectedTask = $0 }
+                )
 
                 // Sections
                 ForEach(sections) { section in
