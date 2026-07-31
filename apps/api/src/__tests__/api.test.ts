@@ -167,6 +167,65 @@ describe("API", () => {
     });
   });
 
+  describe("冪等な作成 (client-generated id)", () => {
+    const clientId = "11111111-2222-4333-8444-555555555555";
+
+    async function postWithId(title: string) {
+      return await mf.dispatchFetch("http://localhost/todos", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ id: clientId, title }),
+      });
+    }
+
+    it("id 付き POST は指定した id で作成される (201)", async () => {
+      const res = await postWithId("移動タスク");
+      expect(res.status).toBe(201);
+      const todo = (await res.json()) as Record<string, unknown>;
+      expect(todo.id).toBe(clientId);
+    });
+
+    it("同じ id の再送は新規作成せず既存行を 200 で返す", async () => {
+      const first = await postWithId("移動タスク");
+      expect(first.status).toBe(201);
+
+      const retry = await postWithId("移動タスク");
+      expect(retry.status).toBe(200);
+      const todo = (await retry.json()) as Record<string, unknown>;
+      expect(todo.id).toBe(clientId);
+      expect(todo.title).toBe("移動タスク");
+
+      const data = await getTodos();
+      expect(data.todos).toHaveLength(1);
+    });
+
+    it("再送時は既存行の状態（完了済み等）をそのまま返す", async () => {
+      await postWithId("移動タスク");
+      await mf.dispatchFetch(`http://localhost/todos/${clientId}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ completed: true }),
+      });
+
+      const retry = await postWithId("移動タスク");
+      expect(retry.status).toBe(200);
+      const todo = (await retry.json()) as Record<string, unknown>;
+      expect(todo.completed).toBe(true);
+
+      const data = await getTodos();
+      expect(data.todos).toHaveLength(1);
+    });
+
+    it("UUID 形式でない id は 400", async () => {
+      const res = await mf.dispatchFetch("http://localhost/todos", {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ id: "not-a-uuid", title: "x" }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe("並べ替え", () => {
     it("reorder で position を一括更新できる", async () => {
       const t1 = await createTodo("A");
@@ -233,9 +292,7 @@ describe("API", () => {
   describe("日付制限", () => {
     it("2日以上前のタスクは更新できない (403)", async () => {
       const db = await getDb();
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const dateStr = twoDaysAgo.toISOString().slice(0, 10);
+      const dateStr = jstDaysFromToday(-2);
 
       await db
         .prepare(
@@ -257,9 +314,7 @@ describe("API", () => {
 
     it("2日以上前のタスクは削除できない (403)", async () => {
       const db = await getDb();
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const dateStr = twoDaysAgo.toISOString().slice(0, 10);
+      const dateStr = jstDaysFromToday(-2);
 
       await db
         .prepare(
@@ -309,16 +364,12 @@ describe("API", () => {
     });
 
     it("1日前は editable: true", async () => {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      const data = await getTodos(d.toISOString().slice(0, 10));
+      const data = await getTodos(jstDaysFromToday(-1));
       expect(data.editable).toBe(true);
     });
 
     it("2日前は editable: false", async () => {
-      const d = new Date();
-      d.setDate(d.getDate() - 2);
-      const data = await getTodos(d.toISOString().slice(0, 10));
+      const data = await getTodos(jstDaysFromToday(-2));
       expect(data.editable).toBe(false);
     });
   });
@@ -326,9 +377,7 @@ describe("API", () => {
   describe("自動繰り越し", () => {
     it("前日の未完了タスクが今日にコピーされる", async () => {
       const db = await getDb();
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = yesterday();
 
       await db.batch([
         db
@@ -358,10 +407,8 @@ describe("API", () => {
 
     it("今日のタスクが既にあれば繰り越しは発動しない", async () => {
       const db = await getDb();
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      const yesterdayStr = d.toISOString().slice(0, 10);
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const yesterdayStr = yesterday();
+      const todayStr = jstDaysFromToday(0);
 
       await db
         .prepare(

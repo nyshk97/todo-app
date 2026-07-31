@@ -9,34 +9,21 @@ type Bindings = {
 const todos = new Hono<{ Bindings: Bindings }>();
 
 // 自動繰り越し処理
+// 「件数チェック→INSERT」を別々に走らせると同時アクセスで二重繰り越しになるため、
+// ガード込みの1文で実行する（NOT EXISTS は文全体の評価前に確定する）
 async function carryOverIfNeeded(db: D1Database, todayStr: string) {
-  // 今日のタスクが既にあれば繰り越し不要
-  const existing = await db
-    .prepare("SELECT COUNT(*) as count FROM todos WHERE date = ?")
-    .bind(todayStr)
-    .first<{ count: number }>();
-
-  if (existing && existing.count > 0) return;
-
-  // 前日の未完了タスクを取得
   const yesterdayStr = yesterday();
-  const uncompleted = await db
+  await db
     .prepare(
-      "SELECT title, position FROM todos WHERE date = ? AND completed = 0 ORDER BY position"
+      `INSERT INTO todos (id, title, date, completed, position, carried_over)
+       SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (random() & 3), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+              title, ?1, 0, position, 1
+       FROM todos
+       WHERE date = ?2 AND completed = 0
+         AND NOT EXISTS (SELECT 1 FROM todos WHERE date = ?1)`
     )
-    .bind(yesterdayStr)
-    .all<{ title: string; position: number }>();
-
-  if (!uncompleted.results || uncompleted.results.length === 0) return;
-
-  // 今日のタスクとしてコピー
-  const stmt = db.prepare(
-    "INSERT INTO todos (id, title, date, completed, position, carried_over) VALUES (?, ?, ?, 0, ?, 1)"
-  );
-  const batch = uncompleted.results.map((task, i) =>
-    stmt.bind(crypto.randomUUID(), task.title, todayStr, i)
-  );
-  await db.batch(batch);
+    .bind(todayStr, yesterdayStr)
+    .run();
 }
 
 // GET /todos?date=YYYY-MM-DD
@@ -72,12 +59,19 @@ todos.get("/", async (c) => {
 });
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // POST /todos
+// body.id (UUID) をクライアントが渡すと冪等になる: 同じ id の再送は新規作成せず
+// 既存行をそのまま 200 で返す。リトライ・二度押しによる二重登録の防止用
 todos.post("/", async (c) => {
-  const body = await c.req.json<{ title: string; date?: string }>();
+  const body = await c.req.json<{ id?: string; title: string; date?: string }>();
   if (!body.title || body.title.trim() === "") {
     return c.json({ error: "title is required" }, 400);
+  }
+  if (body.id !== undefined && !uuidPattern.test(body.id)) {
+    return c.json({ error: "id must be a UUID" }, 400);
   }
 
   const targetDate = body.date ?? today();
@@ -88,20 +82,14 @@ todos.post("/", async (c) => {
     return c.json({ error: "Cannot create tasks outside editable date range" }, 403);
   }
 
-  const id = crypto.randomUUID();
+  const id = body.id ?? crypto.randomUUID();
 
-  // 現在の最大 position を取得
-  const max = await c.env.DB
-    .prepare("SELECT MAX(position) as max_pos FROM todos WHERE date = ?")
-    .bind(targetDate)
-    .first<{ max_pos: number | null }>();
-  const position = (max?.max_pos ?? -1) + 1;
-
-  await c.env.DB
+  // position の採番も含めて1文で行う（SELECT→INSERT の2段だと同時POSTで position が重複する）
+  const result = await c.env.DB
     .prepare(
-      "INSERT INTO todos (id, title, date, position) VALUES (?, ?, ?, ?)"
+      "INSERT OR IGNORE INTO todos (id, title, date, position) SELECT ?, ?, ?, COALESCE(MAX(position), -1) + 1 FROM todos WHERE date = ?"
     )
-    .bind(id, body.title.trim(), targetDate, position)
+    .bind(id, body.title.trim(), targetDate, targetDate)
     .run();
 
   const todo = await c.env.DB
@@ -116,7 +104,7 @@ todos.post("/", async (c) => {
       carried_over: (todo as Record<string, unknown>).carried_over === 1,
       completed_at: (todo as Record<string, unknown>).completed_at ?? null,
     },
-    201
+    result.meta.changes === 0 ? 200 : 201
   );
 });
 

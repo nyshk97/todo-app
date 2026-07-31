@@ -2,6 +2,10 @@ name = "todo-app-api"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 
+# Workers Logs を残す（重複登録などの調査でリクエスト履歴を遡れるように）
+[observability]
+enabled = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "todo-app-db"
