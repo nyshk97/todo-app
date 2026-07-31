@@ -40,7 +40,7 @@
 - **サーバー側の記録**: 全リクエストの所要時間を `{"method","path","status","ms"}` の JSON で console.log している（`apps/api/src/index.ts` のミドルウェア）。Workers Logs 有効化済み（wrangler.toml の `[observability]`）なので Cloudflare ダッシュボード → Workers & Pages → todo-shelf-api → Logs で過去分（無料プランで3日保持）を検索できる。リアルタイム監視は `npx wrangler tail todo-shelf-api`
 - **切り分け**: localStorage に記録あり＋サーバーログの ms が小さい → ネットワーク経路。両方大きい → サーバー側（D1 レイテンシスパイク等）。localStorage に記録がないのに遅く感じた → フロント実装起因（下記）
 - **フロントの既知の「遅く見える」要因**:
-  - 「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）**（未修正）**
+  - ~~「今日へ移動」は todo-app POST → Shelf POST を直列 await し、完了までモーダルが開いたまま。エラーハンドリングもないため失敗するとモーダルが閉じず固まって見える（`App.tsx` handleMoveToToday）~~ → 2026-08-01 修正: 失敗時はリトライ付きトーストを表示。さらに (タスクID, 日付) から決定的に導出した UUID を todo-app POST の冪等キー `id` として送るため、連打・リトライ・数時間後の再操作でも同日移動は todo-app 側に1件しか登録されない（todo-app API 側の `INSERT OR IGNORE` 対応とセット）
   - ~~refreshKey 変更のたびに ProjectView が key ごと再マウントされ「読み込み中...」からフル再取得になる~~ → TanStack Query 導入（cd97f92）で解消。起動時もキャッシュから即描画されるため、「開いたとき遅い」体感は今後ネットワーク/サーバー起因に絞られる
   - 詳細モーダルからの削除が DELETE 送信前に refreshKey を上げて再取得とレースする問題は 175cb45 で修正済み（現在は invalidateQueries ベース）
 

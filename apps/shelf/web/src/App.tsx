@@ -26,6 +26,23 @@ function findMainProject(projects: Project[]): Project | undefined {
   );
 }
 
+/**
+ * (タスクID, 日付) から決定的に UUID を導出する。
+ * todo-app の POST /todos に冪等キーとして渡すことで、連打・リトライ・
+ * 数時間後の再操作でも同じタスクの同日移動は1件しか登録されない
+ */
+async function moveIdempotencyId(taskId: string, date: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`move:${taskId}:${date}`)
+  );
+  const b = new Uint8Array(digest).slice(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function Shell() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -101,50 +118,57 @@ function Shell() {
     const todoAppUrl = import.meta.env.VITE_TODO_APP_API_URL ?? "http://localhost:8788";
     const todoAppSecret = import.meta.env.VITE_API_SECRET ?? "";
     const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const start = performance.now();
-    let res: Response;
     try {
-      res = await fetch(`${todoAppUrl}/todos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${todoAppSecret}`,
-        },
-        body: JSON.stringify({
-          title: task.section_id
-            ? `[${allSections.find((s) => s.id === task.section_id)?.name}] ${task.title}`
-            : task.title,
-          date: today,
-        }),
-      });
-    } catch (e) {
-      recordSlowRequest({
-        at: new Date().toISOString(),
-        method: "POST",
-        path: "todo-app:/todos",
-        ms: Math.round(performance.now() - start),
-        status: "network-error",
-      });
-      throw e;
-    }
-    const ms = Math.round(performance.now() - start);
-    if (ms > 1000) {
-      recordSlowRequest({
-        at: new Date().toISOString(),
-        method: "POST",
-        path: "todo-app:/todos",
-        ms,
-        status: res.status,
-      });
-    }
-    if (!res.ok) {
-      throw new Error("Failed to create todo in todo-app");
-    }
+      const idempotencyId = await moveIdempotencyId(task.id, today);
+      const start = performance.now();
+      let res: Response;
+      try {
+        res = await fetch(`${todoAppUrl}/todos`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${todoAppSecret}`,
+          },
+          body: JSON.stringify({
+            id: idempotencyId,
+            title: task.section_id
+              ? `[${allSections.find((s) => s.id === task.section_id)?.name}] ${task.title}`
+              : task.title,
+            date: today,
+          }),
+        });
+      } catch (e) {
+        recordSlowRequest({
+          at: new Date().toISOString(),
+          method: "POST",
+          path: "todo-app:/todos",
+          ms: Math.round(performance.now() - start),
+          status: "network-error",
+        });
+        throw e;
+      }
+      const ms = Math.round(performance.now() - start);
+      if (ms > 1000) {
+        recordSlowRequest({
+          at: new Date().toISOString(),
+          method: "POST",
+          path: "todo-app:/todos",
+          ms,
+          status: res.status,
+        });
+      }
+      if (!res.ok) {
+        throw new Error("Failed to create todo in todo-app");
+      }
 
-    await api.post(`/tasks/${id}/move-to-today`, {});
-    setSelectedTask(null);
-    invalidateTaskQueries();
-    queryClient.invalidateQueries({ queryKey: ["archived"] });
+      await api.post(`/tasks/${id}/move-to-today`, {});
+      setSelectedTask(null);
+      invalidateTaskQueries();
+      queryClient.invalidateQueries({ queryKey: ["archived"] });
+    } catch {
+      // 冪等IDにより、途中まで成功していてもリトライで二重登録にはならない
+      showToast("今日のTODOへの移動に失敗しました", () => handleMoveToToday(id));
+    }
   };
 
   // キャッシュがあれば isPending は false になり、この画面は初回アクセス時のみ表示される
