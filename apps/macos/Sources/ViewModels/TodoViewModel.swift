@@ -72,7 +72,7 @@ final class TodoViewModel {
         guard !title.isEmpty else { return }
         newTaskTitle = ""
         do {
-            let todo = try await api.createTodo(title: title)
+            let todo = try await api.createTodo(title: title, id: UUID().uuidString.lowercased())
             todos.append(todo)
         } catch {
             self.error = error.localizedDescription

@@ -98,7 +98,11 @@ final class SyncEngine {
         switch op.kind {
         case .create:
             guard let tempId = op.todoId, let title = op.titlePayload else { return }
-            let serverTodo = try await api.createTodo(title: title, date: op.date)
+            let serverTodo = try await api.createTodo(
+                title: title,
+                date: op.date,
+                id: idempotencyId(fromTempId: tempId)
+            )
             let action = try replaceTempId(
                 tempId: tempId,
                 with: serverTodo,
@@ -141,6 +145,15 @@ final class SyncEngine {
             let pairs = items.map { (id: $0.id, position: $0.position) }
             try await api.reorderTodos(items: pairs, date: op.date)
         }
+    }
+
+    // tmp_<UUID> の UUID 部分を POST の冪等キーとして使う。op はリトライ間で tempId を
+    // 保持するため、レスポンス取りこぼし後の再送でもサーバー側は同じ行を返し二重登録にならない
+    private func idempotencyId(fromTempId tempId: String) -> String? {
+        guard tempId.hasPrefix("tmp_") else { return nil }
+        let raw = String(tempId.dropFirst("tmp_".count))
+        guard UUID(uuidString: raw) != nil else { return nil }
+        return raw.lowercased()
     }
 
     private func replaceTempId(

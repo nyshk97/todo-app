@@ -155,16 +155,20 @@ final class TodoViewModel {
         guard !title.isEmpty else { return }
         newTaskTitle = ""
 
+        // 冪等キー。オンラインPOSTがタイムアウトした場合（サーバー側では成功していることがある）、
+        // 同じ id をオフライン op に引き継ぐことで、後の同期での再送が二重登録にならない
+        let id = UUID().uuidString.lowercased()
+
         if monitor.isOnline {
             do {
-                let todo = try await api.createTodo(title: title)
+                let todo = try await api.createTodo(title: title, id: id)
                 todos.append(todo)
                 upsertCache(todo)
                 reloadWidget()
                 return
             } catch {
                 if Self.isNetworkError(error), isToday {
-                    addOfflineTodo(title: title)
+                    addOfflineTodo(title: title, id: id)
                 } else {
                     self.error = error.localizedDescription
                 }
@@ -174,11 +178,11 @@ final class TodoViewModel {
 
         // オフライン: 今日のみ追加可
         guard isToday else { return }
-        addOfflineTodo(title: title)
+        addOfflineTodo(title: title, id: id)
     }
 
-    private func addOfflineTodo(title: String) {
-        let tempId = "tmp_\(UUID().uuidString)"
+    private func addOfflineTodo(title: String, id: String) {
+        let tempId = "tmp_\(id)"
         let now = ISO8601DateFormatter().string(from: .now)
         let nextPosition = (todos.map { $0.position }.max() ?? -1) + 1
         let todo = Todo(

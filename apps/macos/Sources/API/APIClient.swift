@@ -39,8 +39,13 @@ actor APIClient {
         return try decoder.decode(TodosResponse.self, from: data)
     }
 
-    func createTodo(title: String) async throws -> Todo {
-        let data = try await request("/todos", method: "POST", body: ["title": title])
+    // id (UUID) を渡すとサーバー側で冪等になる: 同じ id の再送は二重登録されず既存行が返る
+    func createTodo(title: String, id: String? = nil) async throws -> Todo {
+        var body = ["title": title]
+        if let id {
+            body["id"] = id
+        }
+        let data = try await request("/todos", method: "POST", body: body)
         return try decoder.decode(Todo.self, from: data)
     }
 
