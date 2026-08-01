@@ -26,12 +26,14 @@
 API=https://todo-app-api.d0ne1s-todo.workers.dev
 SECRET=$(grep '^API_SECRET=' apps/todo/ios/.env | cut -d= -f2-)
 
-# 1. 正常系＋D1 読み取り: 今日のタスク一覧が 200 で返る
-curl -s -o /tmp/todo.json -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/todos?date=$(date +%F)"
-jq -e '.todos | type == "array"' /tmp/todo.json   # 配列が返れば D1 まで到達している
+# 1. 正常系＋D1 読み取り: 200 で配列が返る
+#    日付は未来日にする。今日を指定すると carry-over の INSERT が走り読み取り専用でなくなる
+#    （todos.ts の GET は date === today のとき未完了タスクを自動繰り越しする）
+curl -s -o /tmp/todo.json -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/todos?date=2099-01-01"
+jq -e '.todos | type == "array"' /tmp/todo.json   # 配列が返れば D1 まで到達している（空配列でよい）
 
 # 2. 認可: secret なしは 401
-curl -s -o /dev/null -w '%{http_code}\n' "$API/todos?date=$(date +%F)"
+curl -s -o /dev/null -w '%{http_code}\n' "$API/todos?date=2099-01-01"
 
 # 3. 未来日への POST は 403（DB に作成されないので副作用なし）
 curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $SECRET" \
@@ -79,12 +81,14 @@ curl -s -o /tmp/shelf-p.json -w '%{http_code}\n' -H "Authorization: Bearer $SECR
 jq -e 'length > 0' /tmp/shelf-p.json          # プロジェクトが1件以上returnされれば D1 まで到達
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/sections"
 
-# 2. 認可: secret なしは 401
+# 2. 認可: secret なしは両方とも 401
 curl -s -o /dev/null -w '%{http_code}\n' "$API/projects"
+curl -s -o /dev/null -w '%{http_code}\n' "$API/sections"
 ```
 
 - 1 がどちらも `200` かつ `/projects` が非空 → Worker・認証・D1 すべて OK
-- 2 が `401` → 認可 OK（`/sections` はベアパスなので `app.use("/sections", auth)` の付け忘れ検知も兼ねる）
+- 2 がどちらも `401` → 認可 OK。**`/sections` を省略しない**こと（ベアパスなので
+  `app.use("/sections", auth)` の付け忘れは `/projects` だけ見ても検知できない）
 
 ## Web
 
@@ -116,13 +120,18 @@ grep -o "todo-shelf-api\.[a-z0-9.-]*workers\.dev" apps/shelf/web/dist/assets/*.j
 # 3. 公開サイトが本番 API に接続して一覧を描画すること
 agent-browser --session verify open https://todo-shelf-web.pages.dev
 agent-browser --session verify wait --load networkidle
-agent-browser --session verify network requests --type xhr,fetch
+# networkidle だけでは早すぎる。描画完了（「読み込み中...」の消滅）まで待つ
+agent-browser --session verify wait --fn '!document.body.innerText.includes("読み込み中")'
+agent-browser --session verify network requests --type xhr,fetch --status 2xx
 agent-browser --session verify screenshot
 ```
 
 - 1 が `0`、2 が本番ホスト → 焼き込み OK
-- 3 で `todo-shelf-api...workers.dev` への fetch が `200` で、スクリーンショットにタスク一覧が出れば pass
-  （「読み込み中...」やエラー表示、localhost への失敗リクエストがあれば fail）
+- 3 で `todo-shelf-api...workers.dev` への fetch が `2xx` で、スクリーンショットにタスク一覧が出れば pass
+  （エラー表示や localhost への失敗リクエストがあれば fail）
+- **`wait --load networkidle` の直後に撮ると必ず「読み込み中...」になる**（fetch は飛んでいるが
+  レスポンス反映前に networkidle が成立し、`network requests` に status もまだ出ない）。
+  正常なデプロイを fail と誤判定するので、`wait --fn` を必ず挟む
 - **React Router 由来の汎用文字列 `http://localhost` は bundle に1件残る**ので、
   「localhost がゼロ」ではなく**アプリ固有の `localhost:8787` / `localhost:8788` がゼロか**で判定する
 
