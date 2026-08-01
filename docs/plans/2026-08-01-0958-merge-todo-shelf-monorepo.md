@@ -117,7 +117,7 @@ docs/
 - [x] release.sh は実行せず、パス参照のレビューのみ（次回リリース時に実地検証）
 
 ### Phase 4: マージ・push [AI🤖]
-- [ ] `merge-todo-shelf` を main にマージして push
+- [x] `merge-todo-shelf` を main にマージして push（fast-forward。`main` = `origin/main` = 639bdf5）
 
 ### 統合後の確認・移行 [人間👨‍💻]
 - [ ] 他環境の clone を統合後の todo-app に切り替える（todo-shelf の clone は削除）
