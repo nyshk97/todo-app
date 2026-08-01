@@ -65,7 +65,10 @@ App Store では公開していません。利用するには Xcode でソース
 ### セットアップ
 
 ```bash
-npm install
+# git 管理外の設定ファイルが揃っているか確認（不足していれば用意する手順を表示する）
+bash scripts/check-setup.sh
+
+npm ci
 
 # Xcode プロジェクト生成（todo iOS / todo macOS / shelf iOS）
 mise run generate

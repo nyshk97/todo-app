@@ -128,10 +128,11 @@ docs/
 - [x] 指摘7: plan のコミット数・SHA が最終 HEAD 基準では古い → 「merge 直後の数値」と明記
 - [ ] **指摘3: lockfile 再生成が広範な依存更新を含む（todo 7件 / shelf 21件、wrangler 4.79→4.118 等）**。revert はせず明示的な依存更新として受け入れる。**次回 API / Web デプロイ時に本番 smoke を行うこと**（VERIFY.md の該当手順を使う）
 
-### 統合後の確認・移行 [人間👨‍💻]
-- [ ] 他環境の clone を統合後の todo-app に切り替える（todo-shelf の clone は削除）
-- [ ] iOS 実機ビルド: TodoApp / Shelf を新パスの Xcode プロジェクトから Cmd+R でインストールし直して動作確認
-- [ ] TodoMac のホットキー・パネル表示を一通り確認（未署名ビルドのパスが変わると Accessibility 権限の再付与が必要になる可能性あり）
+### 統合後の確認・移行
+- [x] **iOS 実機のビルド・インストール・起動 [AI🤖]**: 新パスの Xcode プロジェクトから実機（iPhone Air）向けにビルド（署名解決込みで両方 BUILD SUCCEEDED）→ `devicectl` で install → launch。TodoApp・Shelf とも起動後10秒以上プロセス生存、クラッシュログなし。TodoApp では `TodoWidgetExtension` プロセスも起動を確認
+- [ ] **iOS 実機の挙動確認 [人間👨‍💻]**: 画面を見ないと判定できない部分。TodoApp（一覧表示・追加・完了・ウィジェットの表示更新）、Shelf（一覧表示・「今日へ移動」が TodoApp 側に反映されるか）
+- [ ] 他環境の clone を統合後の todo-app に切り替える [人間👨‍💻]（`bash scripts/check-setup.sh` で不足ファイルを確認できる。todo-shelf の clone はコピー元なので確認が済むまで消さない）
+- [x] ~~TodoMac のホットキー・パネル表示を一通り確認~~ → **不要と判断**。常用している `/Applications/TodoMac.app`（brew 版）はリポジトリ再配置の影響を受けず、統合前から起動したまま動作している。ただし開発ビルドは DerivedData のパスが変わって TCC 上は別アプリ扱いになるため、次に `mise run todo:build:mac` を使ったときホットキーが効かなければ Accessibility の再付与が必要（CLAUDE.md に既出）
 
 ### Phase 5: 旧リポジトリのクローズ [AI🤖]（上の人間確認が完了してから）
 - [ ] 旧 todo-shelf に移行案内 README を**新規作成**（移行先 nyshk97/todo-app と統合コミットを明記）して push

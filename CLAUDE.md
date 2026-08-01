@@ -37,7 +37,9 @@ docs/
 
 ## よく使うコマンド
 
-`.mise.toml` にタスク定義あり。`mise tasks` で一覧表示。タスク名は `todo:` / `shelf:` プレフィックスで製品別に分かれている。
+`.mise.toml` にタスク定義あり。`mise tasks` で一覧表示。タスク名は `todo:` / `shelf:` プレフィックスで製品別に分かれている（両製品にまたがる `generate` だけプレフィックスなし）。
+
+新しい環境で clone したときや「動かない」ときは `bash scripts/check-setup.sh` を先に実行する。git 管理外の `.env` / `.dev.vars` の過不足を一覧し、不足分の用意方法を表示する（値そのものは表示しない）。
 
 ---
 
