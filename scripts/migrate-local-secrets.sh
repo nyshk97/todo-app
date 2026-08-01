@@ -15,22 +15,50 @@ cd "$REPO_ROOT"
 
 SHELF_SRC="${1:-$HOME/todo-shelf}"
 
-moved=0
+done_count=0
 skipped=0
 notfound=0
+failed=0
 
-report_ok()   { printf '  \033[32m%s\033[0m %s\n         → %s\n' "${3:-移動}" "$1" "$2"; moved=$((moved + 1)); }
+report_ok()   { printf '  \033[32m%s\033[0m %s\n         → %s\n' "${3:-移動}" "$1" "$2"; done_count=$((done_count + 1)); }
 report_skip() { printf '  \033[33mスキップ\033[0m %s（既に存在）\n' "$1"; skipped=$((skipped + 1)); }
 report_none() { printf '  \033[31m見つからない\033[0m %s\n         元: %s\n' "$1" "$2"; notfound=$((notfound + 1)); }
+report_fail() { printf '  \033[31m失敗\033[0m %s\n         元: %s（%s）\n' "$1" "$2" "$3"; failed=$((failed + 1)); }
 
 # take <元パス> <先パス> <mv|cp>
+# コピー系は一時ファイルに書いてサイズを検証してから rename する。
+# 失敗を黙って握りつぶすと「✅ 揃っています」と誤報告してしまうため、
+# 成否を必ず判定して失敗件数に数える。
 take() {
-  local src="$1" dst="$2" mode="$3"
+  local src="$1" dst="$2" mode="$3" label tmp
+  label="$([ "$mode" = mv ] && echo 移動 || echo コピー)"
+
   if [ -s "$dst" ]; then report_skip "$dst"; return; fi
   if [ ! -s "$src" ]; then report_none "$dst" "$src"; return; fi
-  mkdir -p "$(dirname "$dst")"
-  if [ "$mode" = mv ]; then mv "$src" "$dst"; else cp "$src" "$dst"; fi
-  report_ok "$src" "$dst" "$([ "$mode" = mv ] && echo 移動 || echo コピー)"
+
+  if ! mkdir -p "$(dirname "$dst")"; then
+    report_fail "$dst" "$src" "ディレクトリを作成できない"
+    return
+  fi
+
+  if [ "$mode" = mv ]; then
+    if mv "$src" "$dst"; then
+      report_ok "$src" "$dst" "$label"
+    else
+      report_fail "$dst" "$src" "mv に失敗"
+    fi
+    return
+  fi
+
+  tmp="$dst.tmp.$$"
+  if cp "$src" "$tmp" \
+    && [ "$(wc -c < "$tmp")" -eq "$(wc -c < "$src")" ] \
+    && mv "$tmp" "$dst"; then
+    report_ok "$src" "$dst" "$label"
+  else
+    rm -f "$tmp" 2>/dev/null || true
+    report_fail "$dst" "$src" "コピーが不完全"
+  fi
 }
 
 echo "== todo: リポジトリ内の旧パスから移動 =="
@@ -56,8 +84,11 @@ if [ -d "$SHELF_SRC" ]; then
     api_secret="$(sed -n 's/.*apiSecret *= *"\(.*\)".*/\1/p' "$shelf_secrets" | head -1)"
     dev_team="$(sed -n 's/^DEVELOPMENT_TEAM=//p' apps/todo/ios/.env | head -1)"
     if [ -n "$api_secret" ] && [ -n "$dev_team" ]; then
-      printf 'DEVELOPMENT_TEAM=%s\nAPI_SECRET=%s\n' "$dev_team" "$api_secret" > apps/shelf/ios/.env
-      report_ok "$shelf_secrets + apps/todo/ios/.env" apps/shelf/ios/.env 生成
+      if printf 'DEVELOPMENT_TEAM=%s\nAPI_SECRET=%s\n' "$dev_team" "$api_secret" > apps/shelf/ios/.env; then
+        report_ok "$shelf_secrets + apps/todo/ios/.env" apps/shelf/ios/.env 生成
+      else
+        report_fail apps/shelf/ios/.env "$shelf_secrets" "書き込みに失敗"
+      fi
     else
       report_none apps/shelf/ios/.env "値を抽出できなかった（$shelf_secrets / apps/todo/ios/.env）"
     fi
@@ -71,7 +102,7 @@ else
 fi
 
 echo
-echo "== 結果: 移動 $moved / スキップ $skipped / 未解決 $notfound =="
+echo "== 結果: 処理済み $done_count / スキップ $skipped / 未解決 $notfound / 失敗 $failed =="
 
 # 旧ディレクトリの残骸を報告（削除はしない）
 leftovers=""
@@ -87,3 +118,11 @@ fi
 
 echo
 bash "$REPO_ROOT/scripts/check-setup.sh"
+check_rc=$?
+
+if [ "$failed" -gt 0 ]; then
+  echo
+  echo "❌ 移行中に $failed 件失敗しました。上の「失敗」を確認してください。"
+  exit 1
+fi
+exit "$check_rc"
