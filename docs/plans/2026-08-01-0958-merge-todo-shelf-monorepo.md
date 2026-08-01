@@ -29,7 +29,7 @@ todo-app と todo-shelf は別リポジトリだが、連携が深い（shelf �
 - gitignore 対象の実ファイル（git では移動されない。同一マシンなので AI がコピー可能）:
   - todo-app 側（リポジトリ内移動に伴いコピー）: `apps/api/.dev.vars`, `apps/ios/.env`, `apps/macos/.env`（`Secrets.swift` 3つは generate-projects.sh で再生成可能）
   - todo-shelf 側（リポジトリ間コピー）: `apps/api/.dev.vars`, `apps/ios/Sources/Secrets.swift`, `apps/web/.env`, `apps/web/.env.production`
-  - **shelf の `Secrets.swift` は生成スクリプトが存在しない**（現行 generate-projects.sh は todo 側専用）ため、実ファイルのコピーが必須
+  - ~~**shelf の `Secrets.swift` は生成スクリプトが存在しない**（現行 generate-projects.sh は todo 側専用）ため、実ファイルのコピーが必須~~ → **この前提は解消済み**。レビュー指摘（clean clone 問題）を受けて `scripts/generate-projects.sh` を 3 プロジェクト対応に拡張したため、現在は shelf も `apps/shelf/ios/.env` から `Secrets.swift` を生成する。コピーが必要なのは `.env` 系のみ
 - **package-lock.json の再生成は Linux コンテナで行う**（グローバルルール準拠。CI の有無によらずプラットフォーム別 optional 依存の欠落を防ぐ）: `docker run --rm -v "$PWD:/app" -v /app/node_modules -w /app node:22-alpine sh -c "rm -f package-lock.json && npm install --package-lock-only"` → mac と Linux コンテナ両方で `npm ci --dry-run` 検証
 - shelf の `mise run test` は Tasks 系 9 件が main でも失敗する既知の状態。統合後の検証は失敗**数**ではなく**失敗テスト名の集合**で比較する（統合前にベースラインを採取）
 - 既存タグ `v*` は TodoMac のリリース。shelf にはリリースプロセスがないので当面タグ衝突はない。将来 shelf 系でリリースを作る場合はプレフィックス付きタグ（`shelf-v*` 等）を導入する
@@ -123,7 +123,7 @@ docs/
 - [x] 指摘2: shelf iOS が clean clone でビルドできない → `scripts/generate-projects.sh` を 3 プロジェクト対応に拡張（`60afff8`）
 - [x] 指摘1: shelf Web が環境変数なしでも localhost 向けの本番 bundle を作れてしまう → `vite.config.ts` に production ビルド時の必須変数検証を追加、`.env.example` を追跡対象で追加、CLAUDE.md の「本番環境変数は Pages ダッシュボードで設定」という誤った説明を修正
 - [x] 指摘6: `.gitignore` の `.env*` が広すぎる → `.env` / `.env.*` / `!.env.example` に分割
-- [x] 指摘4: 次回 TodoMac リリースノートに shelf 履歴が混入する → `release.sh` を `--generate-notes` から todo スコープの `git log` ベースに変更（63件 → 3件）。あわせて `scripts/migrate-from-todoist.ts` を `scripts/shelf/` へ移動
+- [x] 指摘4: 次回 TodoMac リリースノートに shelf 履歴が混入する → `release.sh` を `--generate-notes` から todo スコープの `git log` ベースに変更。あわせて `scripts/migrate-from-todoist.ts` を `scripts/shelf/` へ移動。**判定基準は件数ではなく「shelf 由来のみのコミットが 0 件」**（件数は以後のコミットで変動するため）。なお todo と shelf を同時に触った混合コミットは件名に "shelf" が残る — pathspec はコミット単位なので件名までは絞れない
 - [x] 指摘5: 現役 docs の旧パス → `docs/refactoring-candidates.md` を新パスに更新。履歴的 docs は当時の記録として残し、`docs/README.md` / `docs/shelf/README.md` にパス読み替え表と旧 SHA の引き方を追加
 - [x] 指摘7: plan のコミット数・SHA が最終 HEAD 基準では古い → 「merge 直後の数値」と明記
 - [ ] **指摘3: lockfile 再生成が広範な依存更新を含む（todo 7件 / shelf 21件、wrangler 4.79→4.118 等）**。revert はせず明示的な依存更新として受け入れる。**次回 API / Web デプロイ時に本番 smoke を行うこと**（VERIFY.md の該当手順を使う）

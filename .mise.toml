@@ -1,4 +1,5 @@
-# タスクは製品ごとに todo: / shelf: のプレフィックスで分ける
+# 製品固有のタスクだけ todo: / shelf: のプレフィックスを付ける。
+# 両製品にまたがるタスク（generate = 3つの Xcode プロジェクト生成）はプレフィックスなし。
 # todo  = 今日やるタスク管理（apps/todo/{api,ios,macos}）
 # shelf = あとでやるタスク管理（apps/shelf/{api,ios,web}）
 

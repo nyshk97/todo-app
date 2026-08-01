@@ -16,7 +16,32 @@
 ## API
 
 - テスト実行: `cd apps/todo/api && npm test`
-- API deploy 後の本番 smoke: `apps/todo/ios/.env` の `API_SECRET` を使い、未来日への `POST /todos` が `403` を返すことを確認する。future date は DB に作成されないため副作用がない。`.dev.vars` は production secret と一致しないことがある。
+
+### API deploy 後の本番 smoke
+
+`apps/todo/ios/.env` の `API_SECRET` を使う（`.dev.vars` は production secret と一致しないことがある）。
+**読み取り（正常系＋D1）と認可の両方**を確認する。認可だけでは Worker 起動しか分からず、D1 の疎通を見逃す。
+
+```bash
+API=https://todo-app-api.d0ne1s-todo.workers.dev
+SECRET=$(grep '^API_SECRET=' apps/todo/ios/.env | cut -d= -f2-)
+
+# 1. 正常系＋D1 読み取り: 今日のタスク一覧が 200 で返る
+curl -s -o /tmp/todo.json -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/todos?date=$(date +%F)"
+jq -e '.todos | type == "array"' /tmp/todo.json   # 配列が返れば D1 まで到達している
+
+# 2. 認可: secret なしは 401
+curl -s -o /dev/null -w '%{http_code}\n' "$API/todos?date=$(date +%F)"
+
+# 3. 未来日への POST は 403（DB に作成されないので副作用なし）
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $SECRET" \
+  -H 'Content-Type: application/json' -d '{"title":"smoke","date":"2099-01-01"}' "$API/todos"
+```
+
+- 1 が `200` かつ `.todos` が配列 → Worker・認証・D1 すべて OK
+- 2 が `401`、3 が `403` → 認可 OK
+- **注意**: Claude Code の Bash から `curl` だけ DNS を引けないことがある。その場合は
+  `agent-browser` で開くか `! curl ...` でユーザーのターミナルに逃がす（グローバル CLAUDE.md 参照）
 
 ## iOS アプリ
 
@@ -41,6 +66,26 @@
 - テスト実行: `cd apps/shelf/api && npm test`
 - Tasks 系 9 件（＋ `Comments` suite）は main でも失敗する既知の状態。**失敗数ではなく失敗テスト名の集合**を main と比較して回帰を判定する
 
+### API deploy 後の本番 smoke
+
+`apps/shelf/web/.env.production` の `VITE_API_SECRET` を使う。読み取り専用なので副作用がない。
+
+```bash
+API=https://todo-shelf-api.d0ne1s-todo.workers.dev
+SECRET=$(grep '^VITE_API_SECRET=' apps/shelf/web/.env.production | cut -d= -f2-)
+
+# 1. 正常系＋D1 読み取り
+curl -s -o /tmp/shelf-p.json -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/projects"
+jq -e 'length > 0' /tmp/shelf-p.json          # プロジェクトが1件以上returnされれば D1 まで到達
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $SECRET" "$API/sections"
+
+# 2. 認可: secret なしは 401
+curl -s -o /dev/null -w '%{http_code}\n' "$API/projects"
+```
+
+- 1 がどちらも `200` かつ `/projects` が非空 → Worker・認証・D1 すべて OK
+- 2 が `401` → 認可 OK（`/sections` はベアパスなので `app.use("/sections", auth)` の付け忘れ検知も兼ねる）
+
 ## Web
 
 ### コード変更後のビルド検証
@@ -54,6 +99,32 @@ npm run build
 
 - 末尾に `✓ built in` が出れば pass
 - 型エラーや Vite build error が出たら fail
+- **`.env.production` が無い / 雛形のままだと意図的に fail する**（`vite.config.ts` のガード）。
+  ビルドが通るかだけ見たいときは `.env.example` をコピーして `VITE_API_SECRET` にダミー値を入れる
+
+### Web deploy 後の本番 smoke
+
+`mise run shelf:deploy:web` は**手元でビルドした bundle をそのまま publish する**（Pages ダッシュボードの
+環境変数は注入されない）。デプロイ後は「本番 API を向いているか」を必ず確認する。
+
+```bash
+# 1. bundle にアプリ固有の localhost が焼き込まれていないこと（0 であること）
+grep -o "localhost:8787\|localhost:8788" apps/shelf/web/dist/assets/*.js | wc -l
+# 2. 本番 API のホスト名が入っていること
+grep -o "todo-shelf-api\.[a-z0-9.-]*workers\.dev" apps/shelf/web/dist/assets/*.js | head -1
+
+# 3. 公開サイトが本番 API に接続して一覧を描画すること
+agent-browser --session verify open https://todo-shelf-web.pages.dev
+agent-browser --session verify wait --load networkidle
+agent-browser --session verify network requests --type xhr,fetch
+agent-browser --session verify screenshot
+```
+
+- 1 が `0`、2 が本番ホスト → 焼き込み OK
+- 3 で `todo-shelf-api...workers.dev` への fetch が `200` で、スクリーンショットにタスク一覧が出れば pass
+  （「読み込み中...」やエラー表示、localhost への失敗リクエストがあれば fail）
+- **React Router 由来の汎用文字列 `http://localhost` は bundle に1件残る**ので、
+  「localhost がゼロ」ではなく**アプリ固有の `localhost:8787` / `localhost:8788` がゼロか**で判定する
 
 ### UI 変更後のローカル表示確認
 
