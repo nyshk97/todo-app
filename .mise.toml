@@ -4,8 +4,8 @@
 
 # ---------------- todo ----------------
 
-[tasks."todo:generate"]
-description = "todo: Xcode プロジェクト生成 (iOS / macOS)"
+[tasks.generate]
+description = "Xcode プロジェクト生成 (todo iOS / todo macOS / shelf iOS)"
 run = "bash scripts/generate-projects.sh"
 
 [tasks."todo:dev"]
@@ -78,8 +78,8 @@ description = "shelf: Web を本番にデプロイ"
 run = "cd apps/shelf/web && npm run build && npx wrangler pages deploy dist --project-name todo-shelf-web"
 
 [tasks."shelf:build:ios"]
-description = "shelf: iOS アプリを Xcode プロジェクト生成して開く"
+description = "shelf: iOS アプリを Xcode で開く (実機接続後 Cmd+R でインストール)"
 run = """
-cd apps/shelf/ios && xcodegen generate
-open Shelf.xcodeproj
+bash scripts/generate-projects.sh
+open apps/shelf/ios/Shelf.xcodeproj
 """

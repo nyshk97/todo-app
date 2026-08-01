@@ -67,12 +67,13 @@ App Store では公開していません。利用するには Xcode でソース
 ```bash
 npm install
 
-# todo の Xcode プロジェクト生成（要 .env ファイル）
-bash scripts/generate-projects.sh
+# Xcode プロジェクト生成（todo iOS / todo macOS / shelf iOS）
+mise run generate
 ```
 
-`apps/todo/ios/.env` と `apps/todo/macos/.env` に `DEVELOPMENT_TEAM=<Your Team ID>` と `API_SECRET=<token>` を設定してください。
-shelf iOS は `apps/shelf/ios/Sources/Secrets.swift` を手動で用意します（生成スクリプトは todo 専用）。
+`apps/todo/ios/.env` `apps/todo/macos/.env` `apps/shelf/ios/.env` の3つに
+`DEVELOPMENT_TEAM=<Your Team ID>` と `API_SECRET=<token>` を設定してください。
+`.env` を置けば `Secrets.swift` は生成スクリプトが自動生成します（どちらも git 管理外）。
 
 ### todo
 

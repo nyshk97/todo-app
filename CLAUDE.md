@@ -80,8 +80,8 @@ docs/
 
 ## ビルド・リリース
 
-- `bash scripts/generate-projects.sh` - todo の iOS/macOS の Xcode プロジェクト生成（`.env` の Team ID をプレースホルダーに置換、`Secrets.swift` を自動生成）
-- `apps/todo/{ios,macos}/.env` に `DEVELOPMENT_TEAM=<Team ID>` と `API_SECRET=<token>` を設定。`Secrets.swift` は gitignore 対象
+- `bash scripts/generate-projects.sh` - **3つの Xcode プロジェクト（todo iOS / todo macOS / shelf iOS）をまとめて生成**（各アプリの `.env` の Team ID をプレースホルダーに置換、`Secrets.swift` を自動生成）
+- `apps/todo/{ios,macos}/.env` と `apps/shelf/ios/.env` に `DEVELOPMENT_TEAM=<Team ID>` と `API_SECRET=<token>` を設定。`.env` も `Secrets.swift` も gitignore 対象なので、新しい環境では手で用意する（`.env` さえ置けば `Secrets.swift` は生成される）
 - `bash scripts/build.sh` - macOS アプリを Release ビルドして zip 化
 - `bash scripts/release.sh <version>` - `MARKETING_VERSION` 自動更新 → Release ビルド → GitHub Release 作成 → homebrew-tap の Cask 更新 → ローカル tap 同期まで自動実行
 
@@ -147,9 +147,8 @@ docs/
 
 ### iOS
 - xcodegen で `apps/shelf/ios/project.yml` からプロジェクト生成
-- API URL・シークレットは `apps/shelf/ios/Sources/Secrets.swift` と `APIClient.swift` にハードコード
-- **shelf の `Secrets.swift` は手動管理**（`scripts/generate-projects.sh` は todo 専用で shelf を生成しない）。git 管理外なので、新しい環境に clone したときは既存環境からコピーする
-- `DEVELOPMENT_TEAM` は project.yml でプレースホルダー（Xcode で初回ビルド時に自動設定される）
+- API URL は `APIClient.swift` にハードコード。シークレットは `apps/shelf/ios/.env` の `API_SECRET` から `scripts/generate-projects.sh` が `Sources/Secrets.swift` を生成する（todo と同じ仕組み。`Secrets.swift` は gitignore 対象）
+- `DEVELOPMENT_TEAM` も `.env` から project.yml のプレースホルダーに差し込まれる
 
 ## プロジェクト名のハードコード
 

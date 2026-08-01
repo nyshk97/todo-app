@@ -98,11 +98,11 @@ agent-browser --session verify eval 'JSON.stringify(performance.getEntriesByType
 
 ### コード変更後のビルド検証
 
-Xcode を開かずに署名なしでシミュレータ向けビルドが通ることを確認する。新ファイル追加時は事前に `xcodegen generate` を実行すること。
+Xcode を開かずに署名なしでシミュレータ向けビルドが通ることを確認する。新ファイル追加時は事前にプロジェクト生成を実行すること。
 
 ```bash
+bash scripts/generate-projects.sh   # 3プロジェクトまとめて生成（Secrets.swift も生成される）
 cd apps/shelf/ios
-xcodegen generate
 xcodebuild -project Shelf.xcodeproj -scheme Shelf \
   -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   -configuration Debug build CODE_SIGNING_ALLOWED=NO

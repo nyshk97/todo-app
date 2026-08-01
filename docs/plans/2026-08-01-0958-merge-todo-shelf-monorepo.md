@@ -105,7 +105,7 @@ docs/
   - shelf 側: `apps/shelf/api/.dev.vars`, `apps/shelf/ios/Sources/Secrets.swift`, `apps/shelf/web/.env`, `apps/shelf/web/.env.production`
 - [x] **コピーした全ファイルを `git check-ignore` で無視対象であることを確認**（特に .env.production の誤コミット防止）。`git status` にも出ていないことを確認
 - [x] CLAUDE.md の記述内パス（`apps/api/` 等）を新構造に合わせて書き換え
-- [x] ~~（任意）generate-projects.sh を shelf iOS にも対応させ、Secrets.swift を .env から生成できるようにする~~ → 見送り。実ファイルコピーで動く状態を優先し、「shelf の Secrets.swift は手動管理」を CLAUDE.md に明記した
+- [x] （任意）generate-projects.sh を shelf iOS にも対応させ、Secrets.swift を .env から生成できるようにする → **実施**（当初は見送ったが、レビューで clean clone 問題として指摘されたため対応。下記ログ参照）
 
 ### Phase 3: 検証 [AI🤖]
 - [x] `npm test --workspace @todo-app/api`: 全パス
@@ -140,6 +140,7 @@ docs/
 ### 方針変更
 - 2026-08-01: 計画レビューを受けて改訂。①取り込みを subtree → filter-repo 方式に変更（--follow が subtree では効かないため）②docs/plans の同名衝突（2026-04-26-ios-offline-support.md）を docs/shelf/ 隔離で回避③ignored ファイルの移行リストを明示＋check-ignore 検証追加④lockfile 再生成を Linux コンテナ方式に修正⑤テスト比較を失敗名の集合比較に強化⑥README 更新・後始末手順を追加⑦archive を人間確認の後（Phase 5）に移動
 - 2026-08-01: 計画レビュー2巡目を受けて改訂。①todo 側 git mv を merge 前にコミットするステップを明示（未コミットだと merge が失敗する再現確認あり）②Phase 1 冒頭に fetch・clean 確認・取り込み元 SHA 固定を追加③履歴検証を commit-map ベースに変更（filter-repo は SHA を振り直すため。commit-map は docs/shelf/migration-commit-map.txt として保全）④衝突チェックにルートファイルの allowlist を導入⑤lockfile 再生成後の lint / typecheck 確認を追加⑥一時 clone に --no-local を明記
+- 2026-08-01: 外部レビューの指摘（clean clone 問題）を受けて `scripts/generate-projects.sh` を 3 プロジェクト対応に拡張。clean clone（tracked ファイルのみ）で再現確認したところ、**todo iOS は空値の Secrets.swift が生成されて BUILD SUCCEEDED、shelf iOS は生成スクリプトが無く `cannot find 'Secrets' in scope` で BUILD FAILED** という非対称があった（旧 todo-shelf からの持ち越しで統合による回帰ではないが、モノレポ化で「clone すれば動く」期待が強まるため解消）。対応: ①ループを `apps/todo/ios` / `apps/todo/macos` / `apps/shelf/ios` の3つに拡張 ②Widget 判定を `[ "$app" = "ios" ]` からディレクトリ実在（`[ -d "$APP_DIR/Widget" ]`）に変更 ③`source` した値が次のループへ漏れないよう毎回リセット ④mise タスクを `todo:generate` → `generate`（3つ生成するので製品別プレフィックスを外す）、`shelf:build:ios` も生成スクリプト経由に統一。手元の `apps/shelf/ios/.env` は既存 Secrets.swift の値から作成（gitignore 対象、値は不変を sha256 で確認）
 - 2026-08-01: lockfile のフル再生成で `eslint-plugin-react-hooks` が 7.0.1 → 7.1.1 に上がり、shelf/web の lint エラーが 1 → 6 に増えた。増分5件はすべて**イベントハンドラ内**の `Date.now()` / `performance.now()` を `react-hooks/purity` が「during render」と誤検知したもので、統合とは無関係。`apps/shelf/web/package.json` で 7.0.1 に固定して lint 出力を統合前と完全一致（Toast.tsx の react-refresh 1件のみ＝統合前から失敗）に戻した。プラグイン更新への追随は別タスク
 - 2026-08-01: `mise run todo:build:mac` の起動確認を見送り（Phase 3 の該当行に理由を記載）。TodoMac は brew 版がユーザー稼働中で、タスク内の `osascript quit` が実行中インスタンスを落とすため
 - 2026-08-01: 計画に無い追加変更を2点入れた。①`.mise.toml` の `release` タスクを deprecated な `{{arg(...)}}` から `usage` 方式（`usage = 'arg "<version>"'` ＋ `$usage_version`）に移行（グローバルルール準拠。ファイルを全面書き換えするタイミングだったため）②`.gitignore` の union で `.env` / `.env.local` を shelf 由来の `.env*` に置換（`apps/shelf/web/.env.production` を確実に無視するため。追跡中の `.env*` が両リポジトリに無いことを確認済み）
