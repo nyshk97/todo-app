@@ -50,7 +50,8 @@ apps/
 packages/
   todo-shared/    ← 旧 todo-app/packages/shared（@todo-app/shared）
   shelf-shared/   ← 旧 todo-shelf/packages/shared（@todo-shelf/shared）
-scripts/          ← 両リポジトリの scripts を統合（衝突なしを確認済み: shelf 側は migrate-from-todoist.ts のみ）
+scripts/          ← 両リポジトリの scripts を統合（衝突なし）。shelf 専用のものは scripts/shelf/ に置く
+                     （release.sh のリリースノートを todo スコープに絞るため）
 docs/
   plans/          ← todo-app の plans ＋ 今後の plan 置き場
   shelf/          ← 旧 todo-shelf/docs 丸ごと（plans 含む。同名衝突回避のため隔離）
@@ -64,7 +65,7 @@ docs/
 ## 実装計画
 
 ### 事前準備 [人間👨‍💻]
-- [ ] 他の環境（別 Mac 等）に todo-shelf / todo-app の未 push 作業がないか確認する
+- [x] 他の環境（別 Mac 等）に todo-shelf / todo-app の未 push 作業がないか確認する（2026-08-01: 未コミットなしを確認済み）
 
 ### Phase 1: 履歴ごと取り込みと再配置 [AI🤖]
 - [x] **取り込み元の固定**: 両リポジトリで `git fetch origin` を実行した上で、
@@ -130,13 +131,13 @@ docs/
 
 ### 統合後の確認・移行
 - [x] **iOS 実機のビルド・インストール・起動 [AI🤖]**: 新パスの Xcode プロジェクトから実機（iPhone Air）向けにビルド（署名解決込みで両方 BUILD SUCCEEDED）→ `devicectl` で install → launch。TodoApp・Shelf とも起動後10秒以上プロセス生存、クラッシュログなし。TodoApp では `TodoWidgetExtension` プロセスも起動を確認
-- [ ] **iOS 実機の挙動確認 [人間👨‍💻]**: 画面を見ないと判定できない部分。TodoApp（一覧表示・追加・完了・ウィジェットの表示更新）、Shelf（一覧表示・「今日へ移動」が TodoApp 側に反映されるか）
-- [ ] 他環境の clone を統合後の todo-app に切り替える [人間👨‍💻]（`bash scripts/check-setup.sh` で不足ファイルを確認できる。todo-shelf の clone はコピー元なので確認が済むまで消さない）
+- [x] **iOS 実機の挙動確認 [人間👨‍💻]**: 2026-08-01 完了。TodoApp・Shelf とも問題なしと確認
+- [x] 他環境の clone を統合後の todo-app に切り替える [人間👨‍💻]: 2026-08-01 完了。`scripts/migrate-local-secrets.sh` で7件すべて移行し `check-setup.sh` 全 OK、`mise run generate` も警告なしで3プロジェクト生成成功
 - [x] ~~TodoMac のホットキー・パネル表示を一通り確認~~ → **不要と判断**。常用している `/Applications/TodoMac.app`（brew 版）はリポジトリ再配置の影響を受けず、統合前から起動したまま動作している。ただし開発ビルドは DerivedData のパスが変わって TCC 上は別アプリ扱いになるため、次に `mise run todo:build:mac` を使ったときホットキーが効かなければ Accessibility の再付与が必要（CLAUDE.md に既出）
 
 ### Phase 5: 旧リポジトリのクローズ [AI🤖]（上の人間確認が完了してから）
-- [ ] 旧 todo-shelf に移行案内 README を**新規作成**（移行先 nyshk97/todo-app と統合コミットを明記）して push
-- [ ] `gh repo archive nyshk97/todo-shelf` でアーカイブ（read-only 化）
+- [x] 旧 todo-shelf に移行案内 README を**新規作成**して push（`c47c8f0`）。移行先のパス対応表、統合コミット `ea34a1b`、SHA が振り直されている旨と commit-map の引き方、手元 clone の移行手順を記載
+- [x] `gh repo archive nyshk97/todo-shelf` でアーカイブ（read-only 化）。`isArchived: true` を確認。archive 後も旧 SHA `cd97f92` が API から引けること、push が拒否されることを確認済み
 - [ ] （任意・後日）リポジトリ名を `todo-app` から中立な名前（例: `todo`）にリネームするか検討。GitHub はリネーム後も旧 URL（git remote・Release ダウンロード URL とも）をリダイレクトするので Cask はそのまま動くが、次回 release.sh 実行前にリポジトリ指定を新名称に更新するのが安全
 
 ## ログ
@@ -154,4 +155,7 @@ docs/
 - 2026-08-01: lockfile のフル再生成で `eslint-plugin-react-hooks` が 7.0.1 → 7.1.1 に上がり、shelf/web の lint エラーが 1 → 6 に増えた。増分5件はすべて**イベントハンドラ内**の `Date.now()` / `performance.now()` を `react-hooks/purity` が「during render」と誤検知したもので、統合とは無関係。`apps/shelf/web/package.json` で 7.0.1 に固定して lint 出力を統合前と完全一致（Toast.tsx の react-refresh 1件のみ＝統合前から失敗）に戻した。プラグイン更新への追随は別タスク
 - 2026-08-01: `mise run todo:build:mac` の起動確認を見送り（Phase 3 の該当行に理由を記載）。TodoMac は brew 版がユーザー稼働中で、タスク内の `osascript quit` が実行中インスタンスを落とすため
 - 2026-08-01: 計画に無い追加変更を2点入れた。①`.mise.toml` の `release` タスクを deprecated な `{{arg(...)}}` から `usage` 方式（`usage = 'arg "<version>"'` ＋ `$usage_version`）に移行（グローバルルール準拠。ファイルを全面書き換えするタイミングだったため）②`.gitignore` の union で `.env` / `.env.local` を shelf 由来の `.env*` に置換（`apps/shelf/web/.env.production` を確実に無視するため。追跡中の `.env*` が両リポジトリに無いことを確認済み）
+- 2026-08-01: **統合完了**。旧 `nyshk97/todo-shelf` に移行案内 README を push（`c47c8f0`）してアーカイブ済み（`isArchived: true`）。archive 後も旧 SHA `cd97f92` が GitHub API から引けること、push が拒否されることを確認。削除ではなくアーカイブに留めたので、旧 SHA を指す既存 URL は解決し続ける
+- 2026-08-01: 他環境（別 Mac）の移行で判明 — **git は gitignore 対象のファイルを移動しないため、統合を pull しただけの環境では `apps/api/.dev.vars` 等が旧パスに残り、新パスからは「無い」状態になる**。`scripts/migrate-local-secrets.sh` を追加して旧パス→新パスの移動＋旧 shelf clone からのコピーを自動化した（7件すべて解決を実機で確認）。あわせて `scripts/check-setup.sh` で不足を検出できるようにした
+- 2026-08-01: bash の罠 — **変数展開の直後に全角文字を置くと変数名の一部として読まれる**（`"（元: $SHELF_SRC）"` が `SHELF_SRC）` という名前になり `unbound variable`）。`${SHELF_SRC}` と明示する必要がある。全スクリプトを機械的に検査して他に無いことを確認済み
 - 2026-08-01: 計画レビュー3巡目を受けて改訂。①clean 確認を todo-app / todo-shelf で分離（todo-app は本 plan が未追跡のため tracked 変更なし＋未追跡は plan のみ、で判定。plan コミット以降は porcelain 空を要求）②merge・commit-map 保全後の後片付けステップを追加（一時 remote 削除・scratchpad の一時 clone / filter-repo スクリプト削除・`git remote -v` 確認）

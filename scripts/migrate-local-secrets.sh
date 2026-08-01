@@ -19,7 +19,7 @@ moved=0
 skipped=0
 notfound=0
 
-report_ok()   { printf '  \033[32m移動\033[0m %s\n         → %s\n' "$1" "$2"; moved=$((moved + 1)); }
+report_ok()   { printf '  \033[32m%s\033[0m %s\n         → %s\n' "${3:-移動}" "$1" "$2"; moved=$((moved + 1)); }
 report_skip() { printf '  \033[33mスキップ\033[0m %s（既に存在）\n' "$1"; skipped=$((skipped + 1)); }
 report_none() { printf '  \033[31m見つからない\033[0m %s\n         元: %s\n' "$1" "$2"; notfound=$((notfound + 1)); }
 
@@ -30,7 +30,7 @@ take() {
   if [ ! -s "$src" ]; then report_none "$dst" "$src"; return; fi
   mkdir -p "$(dirname "$dst")"
   if [ "$mode" = mv ]; then mv "$src" "$dst"; else cp "$src" "$dst"; fi
-  report_ok "$src" "$dst"
+  report_ok "$src" "$dst" "$([ "$mode" = mv ] && echo 移動 || echo コピー)"
 }
 
 echo "== todo: リポジトリ内の旧パスから移動 =="
@@ -57,7 +57,7 @@ if [ -d "$SHELF_SRC" ]; then
     dev_team="$(sed -n 's/^DEVELOPMENT_TEAM=//p' apps/todo/ios/.env | head -1)"
     if [ -n "$api_secret" ] && [ -n "$dev_team" ]; then
       printf 'DEVELOPMENT_TEAM=%s\nAPI_SECRET=%s\n' "$dev_team" "$api_secret" > apps/shelf/ios/.env
-      report_ok "$shelf_secrets + apps/todo/ios/.env" apps/shelf/ios/.env
+      report_ok "$shelf_secrets + apps/todo/ios/.env" apps/shelf/ios/.env 生成
     else
       report_none apps/shelf/ios/.env "値を抽出できなかった（$shelf_secrets / apps/todo/ios/.env）"
     fi
