@@ -41,6 +41,8 @@ docs/
 
 新しい環境で clone したときや「動かない」ときは `bash scripts/check-setup.sh` を先に実行する。git 管理外の `.env` / `.dev.vars` の過不足を一覧し、不足分の用意方法を表示する（値そのものは表示しない）。
 
+統合前から clone を持っていた環境では `bash scripts/migrate-local-secrets.sh [<旧 todo-shelf clone のパス>]` を1回実行する。**git は gitignore 対象のファイルを移動しないので、pull 後も `apps/api/.dev.vars` などが旧パスに残っている**。これを新パスへ移し、shelf 側は旧 clone からコピーする（`apps/shelf/ios/.env` は旧 clone の `Secrets.swift` と todo の `DEVELOPMENT_TEAM` から組み立てる）。既存ファイルは上書きしないので何度実行してもよい。
+
 ---
 
 # todo（`apps/todo/`）
