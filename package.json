@@ -2,7 +2,7 @@
   "name": "todo-app",
   "private": true,
   "workspaces": [
-    "apps/*",
+    "apps/*/*",
     "packages/*"
   ]
 }
