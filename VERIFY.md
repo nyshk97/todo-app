@@ -11,6 +11,45 @@
 
 ---
 
+# iOS 実機での確認（todo / shelf 共通）
+
+「ビルド → インストール → 起動 → プロセス生存」までは CLI で完結できる。
+Xcode を開いて Cmd+R する必要はない。画面の目視が要る部分だけ人に依頼する。
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+# Model 列にスペースが入るので列番号では取れない。UDID の形で抜く
+DEV=$(xcrun devicectl list devices | grep "available (paired)" \
+  | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | head -1)
+
+cd apps/todo/ios          # shelf は apps/shelf/ios
+PROJ=TodoApp; BUNDLE=com.d0ne1s.todoapp    # shelf は PROJ=Shelf; BUNDLE=com.d0ne1s.shelf
+
+# 1. 実機向けビルド（署名・プロビジョニングの解決までここで確認できる）
+xcodebuild -project "$PROJ.xcodeproj" -scheme "$PROJ" -destination "id=$DEV" -configuration Debug build
+
+# 2. install → launch
+APP=$(xcodebuild -project "$PROJ.xcodeproj" -scheme "$PROJ" -destination "id=$DEV" -configuration Debug \
+  -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR /{print $2}' | head -1)/$PROJ.app
+xcrun devicectl device install app --device "$DEV" "$APP"
+xcrun devicectl device process launch --device "$DEV" --terminate-existing "$BUNDLE"
+
+# 3. 10秒ほど置いて同じ pid で生きているか（クラッシュ再起動の検出）
+sleep 10 && xcrun devicectl device info processes --device "$DEV" | grep "$PROJ"
+```
+
+- `BUILD SUCCEEDED` ＋ install 成功 ＋ 10秒後も同じ pid → 起動まわりは pass
+- TodoApp では `TodoWidgetExtension` のプロセスも出ればウィジェットが読み込まれている
+- **端末がロックされていると失敗するが、症状が段階によって違う**（どれも実機側の異常ではないので、まず解除してリトライする）
+  - ビルド: `Timed out waiting for all destinations ... may need to be unlocked`
+  - install: **ロック中でも成功する**
+  - launch: `FBSOpenApplicationServiceErrorDomain error 1` / `CoreDeviceError error 10002`
+  - 作業中に再ロックされることがあるので、install が通ったのに launch だけ落ちたらまずロックを疑う
+- 実機ビルドはシミュレータビルドと違って**署名・プロビジョニングまで解決する**ので、`.xcodeproj` の再生成やパス変更の後はこれを通しておくと Xcode で詰まらない
+- 以下は画面を見ないと判定できないのでユーザーに依頼する: 一覧の表示内容、タスクの追加・完了、ウィジェットの表示更新、shelf の「今日へ移動」が todo 側に反映されるか
+
+---
+
 # todo（`apps/todo/`）
 
 ## API
