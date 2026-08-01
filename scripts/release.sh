@@ -27,11 +27,33 @@ fi
 rm -rf "$BUILD_DIR"
 bash "$REPO_ROOT/scripts/build.sh"
 
+# リリースノートは todo 配下の変更だけから作る。
+# モノレポ化で shelf のコミットも v* タグ間に入るため、--generate-notes だと
+# TodoMac と無関係な履歴が大量に混入する（v1.17.1 時点で 64 件中 48 件が shelf）。
+PREV_TAG="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+# pathspec は各コミット当時のパスに対して評価されるため、
+# scripts/shelf/ へ移す前の旧パスも除外しないと過去の shelf コミットが残る
+TODO_PATHS=(
+  apps/todo
+  packages/todo-shared
+  scripts
+  ':(exclude)scripts/shelf'
+  ':(exclude)scripts/migrate-from-todoist.ts'
+)
+if [ -n "$PREV_TAG" ]; then
+  NOTES="$(git log --no-merges --pretty='- %s' "$PREV_TAG..HEAD" -- "${TODO_PATHS[@]}")"
+else
+  NOTES="$(git log --no-merges --pretty='- %s' -20 -- "${TODO_PATHS[@]}")"
+fi
+if [ -z "$NOTES" ]; then
+  NOTES="- メンテナンスリリース"
+fi
+
 # GitHub Release 作成
 gh release create "v$VERSION" "$ZIP_FILE" \
   --repo nyshk97/todo-app \
   --title "v$VERSION" \
-  --generate-notes
+  --notes "$NOTES"
 
 SHA256=$(shasum -a 256 "$ZIP_FILE" | awk '{print $1}')
 

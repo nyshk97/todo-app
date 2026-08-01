@@ -117,7 +117,16 @@ docs/
 - [x] release.sh は実行せず、パス参照のレビューのみ（次回リリース時に実地検証）
 
 ### Phase 4: マージ・push [AI🤖]
-- [x] `merge-todo-shelf` を main にマージして push（fast-forward。`main` = `origin/main` = 639bdf5）
+- [x] `merge-todo-shelf` を main にマージして push（fast-forward）。マージ時点は 639bdf5。その後レビュー対応を main に直接積んでいるので、**最新の SHA は `git log -1` で確認すること**（この行の SHA を最終結果として読まない）
+
+### 外部レビュー対応 [AI🤖]
+- [x] 指摘2: shelf iOS が clean clone でビルドできない → `scripts/generate-projects.sh` を 3 プロジェクト対応に拡張（`60afff8`）
+- [x] 指摘1: shelf Web が環境変数なしでも localhost 向けの本番 bundle を作れてしまう → `vite.config.ts` に production ビルド時の必須変数検証を追加、`.env.example` を追跡対象で追加、CLAUDE.md の「本番環境変数は Pages ダッシュボードで設定」という誤った説明を修正
+- [x] 指摘6: `.gitignore` の `.env*` が広すぎる → `.env` / `.env.*` / `!.env.example` に分割
+- [x] 指摘4: 次回 TodoMac リリースノートに shelf 履歴が混入する → `release.sh` を `--generate-notes` から todo スコープの `git log` ベースに変更（63件 → 3件）。あわせて `scripts/migrate-from-todoist.ts` を `scripts/shelf/` へ移動
+- [x] 指摘5: 現役 docs の旧パス → `docs/refactoring-candidates.md` を新パスに更新。履歴的 docs は当時の記録として残し、`docs/README.md` / `docs/shelf/README.md` にパス読み替え表と旧 SHA の引き方を追加
+- [x] 指摘7: plan のコミット数・SHA が最終 HEAD 基準では古い → 「merge 直後の数値」と明記
+- [ ] **指摘3: lockfile 再生成が広範な依存更新を含む（todo 7件 / shelf 21件、wrangler 4.79→4.118 等）**。revert はせず明示的な依存更新として受け入れる。**次回 API / Web デプロイ時に本番 smoke を行うこと**（VERIFY.md の該当手順を使う）
 
 ### 統合後の確認・移行 [人間👨‍💻]
 - [ ] 他環境の clone を統合後の todo-app に切り替える（todo-shelf の clone は削除）
@@ -134,7 +143,7 @@ docs/
 - 2026-08-01: gitignore 対象の実ファイルを両リポジトリで棚卸し（前提セクションに反映）。git-filter-repo は未インストールだが python3 あり、単一スクリプト取得で実行可能
 - 2026-08-01: 取り込み元 SHA を固定。todo-shelf `c30a3d49304503edf7afd87843fbad95bb0de4be`（HEAD == origin/main、porcelain 空）／todo-app `9d870642262be530aadfd0bb72b2b39cc3259ae5`（HEAD == origin/main、未追跡は本 plan のみ）
 - 2026-08-01: filter-repo の `--path-rename` は指定した5つのプレフィックスが互いに素なので順序依存なし。`--dry-run` の `.git/filter-repo/fast-export.filtered` を parse して、書き換え後パスが `apps/shelf/` `packages/shelf-shared/` `docs/shelf/` `scripts/` ＋ルート6ファイルだけになることを事前確認した
-- 2026-08-01: 履歴検証 pass。コミット数 99（旧 todo-app）+ 55（shelf）+ 3（plan / 再配置 / merge）= 157 で一致。todo 側の旧 SHA は不変（filter-repo をかけていないため）、shelf 側は `docs/shelf/migration-commit-map.txt` で対応が引ける。`git log -- apps/shelf/api/src/index.ts` が `--follow` なしで初出（2026-04-15）まで遡れることを確認
+- 2026-08-01: 履歴検証 pass。**merge コミット `ea34a1b` 時点**で 99（旧 todo-app）+ 55（shelf）+ 3（plan / 再配置 / merge）= 157 と一致（この 157 は merge 直後の数値であって最終結果ではない。以降のパス修正・lockfile 再生成・レビュー対応コミットで増える）。todo 側の旧 SHA は不変（filter-repo をかけていないため）、shelf 側は `docs/shelf/migration-commit-map.txt` で対応が引ける。`git log -- apps/shelf/api/src/index.ts` が `--follow` なしで初出（2026-04-15）まで遡れることを確認
 - 2026-08-01: shelf テストのベースライン採取。`Tests 9 failed | 11 passed | 4 skipped (24)`。失敗は `Comments`（suite）＋ `Tasks > {creates a task without section, creates a task with section, lists tasks for project, updates task with due_date, clears task due_date with null, moves task to different section (null), reorders tasks, returns upcoming tasks, deletes a task}`
 
 ### 方針変更

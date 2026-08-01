@@ -49,7 +49,7 @@
 
 ## 3. API `todos.ts` のコード重複（優先度: 高）
 
-`apps/api/src/todos.ts`（220行）に 4 つの重複パターンがある。
+`apps/todo/api/src/todos.ts`（220行）に 4 つの重複パターンがある。
 
 ### 3-1. Todo レスポンス変換（3箇所）
 
@@ -94,7 +94,7 @@ INSERT/UPDATE 後に同じ SELECT で取り直している。
 ## 4. API の型安全性（優先度: 中）
 
 - D1 の行データを `Record<string, unknown>` で受け取り、各所でインラインキャストしている
-- `packages/shared` に型定義があるのに API 側で活用されていない
+- `packages/todo-shared` に型定義があるのに API 側で活用されていない
 
 ### 対応案
 

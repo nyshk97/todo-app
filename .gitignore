@@ -24,7 +24,10 @@ build/
 .DS_Store
 
 # Environment
-.env*
+# .env.production も含めて無視するが、雛形の .env.example だけは追跡する
+.env
+.env.*
+!.env.example
 
 # Generated secrets
 Secrets.swift

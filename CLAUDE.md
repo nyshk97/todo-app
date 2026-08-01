@@ -142,8 +142,9 @@ docs/
   - `TODO_APP_API_URL`
 
 ### Web（Cloudflare Pages）
-- `apps/shelf/web/.env` にローカル用の環境変数あり（`VITE_API_URL`, `VITE_API_SECRET` 等）
-- 本番の環境変数は Cloudflare Pages ダッシュボードで設定
+- 必要な変数は `apps/shelf/web/.env.example`（追跡対象）を参照。ローカル用は `.env`、本番用は `.env.production`（どちらも gitignore 対象）
+- **本番の値は手元の `vite build` で bundle に焼き込まれる**。Pages は Git 連携なしの手動デプロイ（`mise run shelf:deploy:web`）なので、**Pages ダッシュボードの環境変数は手元のビルドには注入されない**。`.env.production` を移し忘れると localhost 向けの本番サイトを publish してしまうため、`vite.config.ts` が production ビルド時に必須変数の未設定・localhost を検出して落とす
+- そのため `npm run build`（production モード）は `.env.production` が無い環境では意図的に失敗する。ビルドが通るかだけ確認したいときは `.env.example` をコピーしてダミー値を入れる
 
 ### iOS
 - xcodegen で `apps/shelf/ios/project.yml` からプロジェクト生成

@@ -2,7 +2,7 @@
  * Todoist → todo-shelf 移行スクリプト
  *
  * Usage:
- *   npx tsx scripts/migrate-from-todoist.ts
+ *   npx tsx scripts/shelf/migrate-from-todoist.ts
  *
  * Environment variables:
  *   TODOIST_TOKEN    - Todoist API token
