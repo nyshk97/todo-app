@@ -1,0 +1,26 @@
+name: Shelf
+options:
+  bundleIdPrefix: com.d0ne1s
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+
+targets:
+  Shelf:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.shelf
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "6.0"
+        DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"

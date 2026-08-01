@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <rect width="48" height="48" fill="#181c25"/>
+
+  <!-- Shelf horizontal bar -->
+  <rect x="6" y="31" width="36" height="3" rx="1" fill="#9ca3af"/>
+
+  <!-- Items on shelf -->
+  <rect x="10" y="17" width="12" height="12" rx="2.5" fill="#6aabf5"/>
+  <rect x="26" y="14" width="13" height="15" rx="2.5" fill="#f0a030"/>
+</svg>

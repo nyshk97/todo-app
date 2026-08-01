@@ -1,20 +1,136 @@
 # 動作確認手順
 
+このリポジトリは todo（今日やるタスク）と shelf（あとでやるタスク）の 2 プロダクトを含む。
+変更したプロダクトの手順だけを選んで実行する。
+
+---
+
+# todo（`apps/todo/`）
+
 ## API
 
-- テスト実行: `cd apps/api && npm test`
-- API deploy 後の本番 smoke: `apps/ios/.env` の `API_SECRET` を使い、未来日への `POST /todos` が `403` を返すことを確認する。future date は DB に作成されないため副作用がない。`.dev.vars` は production secret と一致しないことがある。
+- テスト実行: `cd apps/todo/api && npm test`
+- API deploy 後の本番 smoke: `apps/todo/ios/.env` の `API_SECRET` を使い、未来日への `POST /todos` が `403` を返すことを確認する。future date は DB に作成されないため副作用がない。`.dev.vars` は production secret と一致しないことがある。
 
 ## iOS アプリ
 
-- 実機にインストール: `mise run build:ios` → Xcode で iPhone を選択して Cmd+R
-- シミュレータ向けビルド検証 (CLI): `bash scripts/generate-projects.sh && xcodebuild -project apps/ios/TodoApp.xcodeproj -scheme TodoApp -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build`
+- 実機にインストール: `mise run todo:build:ios` → Xcode で iPhone を選択して Cmd+R
+- シミュレータ向けビルド検証 (CLI): `bash scripts/generate-projects.sh && xcodebuild -project apps/todo/ios/TodoApp.xcodeproj -scheme TodoApp -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build`
 
 ## macOS アプリ
 
-- ビルド＆起動: `mise run build:mac`
+- ビルド＆起動: `mise run todo:build:mac`
 
 ## リリース
 
-- ビルド: `mise run build`
-- リリース作成: `mise run release -- <version>`
+- ビルド: `mise run todo:build`
+- リリース作成: `mise run todo:release -- <version>`
+
+---
+
+# shelf（`apps/shelf/`）
+
+## API
+
+- テスト実行: `cd apps/shelf/api && npm test`
+- Tasks 系 9 件（＋ `Comments` suite）は main でも失敗する既知の状態。**失敗数ではなく失敗テスト名の集合**を main と比較して回帰を判定する
+
+## Web
+
+### コード変更後のビルド検証
+
+Web UI 変更後に TypeScript と Vite の本番ビルドが通ることを確認する。
+
+```bash
+cd apps/shelf/web
+npm run build
+```
+
+- 末尾に `✓ built in` が出れば pass
+- 型エラーや Vite build error が出たら fail
+
+### UI 変更後のローカル表示確認
+
+ローカルの Vite サーバーで対象画面を開き、変更した UI が意図した状態で表示されることを確認する。
+
+```bash
+cd apps/shelf/web
+VITE_API_URL=https://todo-shelf-api.d0ne1s-todo.workers.dev npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+- `http://127.0.0.1:5173/` をブラウザで開き、対象 UI を目視確認できれば pass
+- API データが必要な確認では、データ作成や削除を伴わない操作に留める
+
+### キャッシュ層（TanStack Query）の回帰確認
+
+キャッシュまわり（クエリキー、invalidate、persister 設定）を変更したときに確認する。agent-browser で:
+
+```bash
+agent-browser --session verify open http://localhost:5174 && agent-browser --session verify wait --load networkidle
+# 1. localStorage にキャッシュが永続化されているか
+agent-browser --session verify eval 'JSON.parse(localStorage.getItem("todo-shelf-query-cache")).clientState.queries.map(q => q.queryKey)'
+# 2. API を遮断してリロードしてもキャッシュから描画されるか
+agent-browser --session verify network route "http://localhost:8787/**" --abort
+agent-browser --session verify open http://localhost:5174 && agent-browser --session verify wait 1500 && agent-browser --session verify screenshot
+```
+
+- 1 で `["projects"], ["sections"], ["upcoming"], ["tasks", <projectId>]` が出れば pass
+- 2 のスクリーンショットでタスク一覧が表示されていれば pass（「読み込み中...」やエラー表示なら fail）
+- 変更操作（追加・削除・更新）の後は `network requests --type xhr,fetch` で該当クエリの refetch（invalidate）が飛んでいることを確認する
+
+### フォーカス復帰時・定期の再取得（focusManager / refetchInterval）
+
+フォーカス再取得やポーリング設定（main.tsx）を変更したときに確認する。API リクエストの発生時刻は Performance API で取る:
+
+```bash
+# focus イベントを合成して再取得が飛ぶか（staleTime 30秒を超えてから実行すること）
+agent-browser --session verify eval 'window.dispatchEvent(new Event("focus")); "dispatched at " + Math.round(performance.now())'
+agent-browser --session verify wait 2000
+agent-browser --session verify eval 'JSON.stringify(performance.getEntriesByType("resource").filter(e => e.name.includes("localhost:8787")).map(e => Math.round(e.startTime)))'
+```
+
+- dispatch 時刻と同時刻の API リクエスト群が増えていれば pass
+- **1回目だけでなく、2回目の focus 合成でも再取得されることを必ず確認する**（`handleFocus(true)` と boolean を渡す実装ミスだと初回しか効かず、1回の確認ではすり抜ける）
+- 前回取得から 30 秒以内の focus では再取得されないこと（staleTime 尊重）も正常挙動
+- refetchInterval のポーリングは resource entries が約 60 秒間隔で増えることで確認できる。interval タイマーは focus 再取得のたびにリセットされるので、focus 検証は「直前の取得時刻 + 30秒 〜 + 60秒」の窓を狙う
+
+## iOS
+
+### コード変更後のビルド検証
+
+Xcode を開かずに署名なしでシミュレータ向けビルドが通ることを確認する。新ファイル追加時は事前に `xcodegen generate` を実行すること。
+
+```bash
+cd apps/shelf/ios
+xcodegen generate
+xcodebuild -project Shelf.xcodeproj -scheme Shelf \
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  -configuration Debug build CODE_SIGNING_ALLOWED=NO
+```
+
+- 末尾が `** BUILD SUCCEEDED **` なら pass
+- 警告抽出: `... 2>&1 | grep -E "(warning:|error:)" | grep -v AppIntents.framework`
+- `AppIntents.framework` 関連 warning は AppIntents 未使用のため無視
+- `xcode-select` が CommandLineTools を向いていて `requires Xcode` エラーが出る場合は `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` を付ける
+
+### シミュレータでの起動・UI 確認
+
+UI 変更後、実機ビルドを依頼する前にシミュレータで起動と画面表示を確認する。
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+UDID=$(xcrun simctl list devices available | grep "iPhone 17 (" | grep -oE '[0-9A-F-]{36}')
+xcrun simctl boot $UDID; xcrun simctl bootstatus $UDID -b
+xcrun simctl install $UDID ~/Library/Developer/Xcode/DerivedData/Shelf-*/Build/Products/Debug-iphonesimulator/Shelf.app
+xcrun simctl launch $UDID com.d0ne1s.shelf
+sleep 4 && xcrun simctl io $UDID screenshot /tmp/shelf.png  # 起動画面を目視
+```
+
+- スクリーンショットにタスク一覧が表示されていれば pass（クラッシュ・空画面なら fail）
+- ログを見たい場合は `launch` を `xcrun simctl launch --console-pty $UDID com.d0ne1s.shelf > app.log 2>&1 &` に置き換える
+- **注意**: シミュレータのアプリも本番 API に接続する。検証操作はデータ変更を伴わないものに留める（タップで詳細を開く、同位置ドロップ等）
+- タッチ合成が必要なジェスチャー検証はグローバル CLAUDE.md の「iOS Simulator へのタッチ合成」を参照
+
+### オフライン回帰確認
+
+一度オンラインで読み込んで cache を作った後、機内モードで一覧が表示されること、タスク追加・削除・タイトル更新が即時反映され未同期表示になること、オンライン復帰後に同期されることを確認する。コメント/添付/due date/移動/並び替え/プロジェクト・セクション操作はオフライン中に操作できないことを確認する。

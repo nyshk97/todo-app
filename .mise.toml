@@ -1,45 +1,85 @@
-[tasks.generate]
-description = "Xcode プロジェクト生成"
+# タスクは製品ごとに todo: / shelf: のプレフィックスで分ける
+# todo  = 今日やるタスク管理（apps/todo/{api,ios,macos}）
+# shelf = あとでやるタスク管理（apps/shelf/{api,ios,web}）
+
+# ---------------- todo ----------------
+
+[tasks."todo:generate"]
+description = "todo: Xcode プロジェクト生成 (iOS / macOS)"
 run = "bash scripts/generate-projects.sh"
 
-[tasks.dev]
-description = "API ローカル開発サーバー起動"
-run = "cd apps/api && npm run dev"
+[tasks."todo:dev"]
+description = "todo: API ローカル開発サーバー起動"
+run = "cd apps/todo/api && npm run dev"
 
-[tasks.test]
-description = "API テスト実行"
-run = "cd apps/api && npm test"
+[tasks."todo:test"]
+description = "todo: API テスト実行"
+run = "cd apps/todo/api && npm test"
 
-[tasks.deploy]
-description = "API を本番にデプロイ"
-run = "cd apps/api && npx wrangler deploy"
+[tasks."todo:deploy"]
+description = "todo: API を本番にデプロイ"
+run = "cd apps/todo/api && npx wrangler deploy"
 
-[tasks."deploy:migrate"]
-description = "本番 DB にマイグレーション適用"
-run = "cd apps/api && npx wrangler d1 migrations apply todo-app-db --remote"
+[tasks."todo:deploy:migrate"]
+description = "todo: 本番 DB にマイグレーション適用"
+run = "cd apps/todo/api && npx wrangler d1 migrations apply todo-app-db --remote"
 
-[tasks.build]
-description = "macOS アプリを Release ビルド"
+[tasks."todo:build"]
+description = "todo: macOS アプリを Release ビルド"
 run = "bash scripts/build.sh"
 
-[tasks.release]
-description = "GitHub Release 作成 (例: mise run release -- 1.2.0)"
-run = "bash scripts/release.sh {{arg(name='version')}}"
+[tasks."todo:release"]
+description = "todo: GitHub Release 作成 (例: mise run todo:release -- 1.2.0)"
+usage = 'arg "<version>"'
+run = "bash scripts/release.sh $usage_version"
 
-[tasks."build:ios"]
-description = "iOS アプリを Xcode で開く (実機接続後 Cmd+R でインストール)"
+[tasks."todo:build:ios"]
+description = "todo: iOS アプリを Xcode で開く (実機接続後 Cmd+R でインストール)"
 run = """
 bash scripts/generate-projects.sh
-open apps/ios/TodoApp.xcodeproj
+open apps/todo/ios/TodoApp.xcodeproj
 """
 
-[tasks."build:mac"]
-description = "macOS アプリをビルドして起動"
+[tasks."todo:build:mac"]
+description = "todo: macOS アプリをビルドして起動"
 run = """
 bash scripts/generate-projects.sh
-cd apps/macos
+cd apps/todo/macos
 osascript -e 'tell application "TodoMac" to quit' 2>/dev/null || true
 xcodebuild build -project TodoMac.xcodeproj -scheme TodoMac -destination 'platform=macOS' CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO -quiet
 APP_PATH=$(xcodebuild -project TodoMac.xcodeproj -scheme TodoMac -destination 'platform=macOS' -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR /{print $2}' | head -1)/TodoMac.app
 open "$APP_PATH"
+"""
+
+# ---------------- shelf ----------------
+
+[tasks."shelf:dev"]
+description = "shelf: API ローカル開発サーバー起動"
+run = "cd apps/shelf/api && npm run dev"
+
+[tasks."shelf:test"]
+description = "shelf: API テスト実行"
+run = "cd apps/shelf/api && npm test"
+
+[tasks."shelf:deploy"]
+description = "shelf: API を本番にデプロイ"
+run = "cd apps/shelf/api && npx wrangler deploy"
+
+[tasks."shelf:deploy:migrate"]
+description = "shelf: 本番 DB にマイグレーション適用"
+run = "cd apps/shelf/api && npx wrangler d1 migrations apply todo-shelf-db --remote"
+
+[tasks."shelf:dev:web"]
+description = "shelf: Web ローカル開発サーバー起動"
+run = "cd apps/shelf/web && npm run dev"
+
+[tasks."shelf:deploy:web"]
+description = "shelf: Web を本番にデプロイ"
+run = "cd apps/shelf/web && npm run build && npx wrangler pages deploy dist --project-name todo-shelf-web"
+
+[tasks."shelf:build:ios"]
+description = "shelf: iOS アプリを Xcode プロジェクト生成して開く"
+run = """
+cd apps/shelf/ios && xcodegen generate
+open Shelf.xcodeproj
 """
