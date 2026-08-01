@@ -13,12 +13,12 @@ BUILD_DIR="$REPO_ROOT/build"
 ZIP_FILE="$BUILD_DIR/TodoMac.zip"
 
 # MARKETING_VERSION を更新
-sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$VERSION\"/" "$REPO_ROOT/apps/macos/project.yml"
+sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$VERSION\"/" "$REPO_ROOT/apps/todo/macos/project.yml"
 
 # バージョン更新をコミット
 cd "$REPO_ROOT"
-if ! git diff --quiet apps/macos/project.yml; then
-  git add apps/macos/project.yml
+if ! git diff --quiet apps/todo/macos/project.yml; then
+  git add apps/todo/macos/project.yml
   git commit -m "chore: bump macOS app version to $VERSION"
   git push origin main
 fi

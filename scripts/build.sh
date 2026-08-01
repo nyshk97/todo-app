@@ -2,7 +2,7 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_DIR="$REPO_ROOT/apps/macos"
+APP_DIR="$REPO_ROOT/apps/todo/macos"
 BUILD_DIR="$REPO_ROOT/build"
 
 # プロジェクト生成

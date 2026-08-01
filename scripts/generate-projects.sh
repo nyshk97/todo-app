@@ -5,7 +5,7 @@ set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 for app in ios macos; do
-  APP_DIR="$REPO_ROOT/apps/$app"
+  APP_DIR="$REPO_ROOT/apps/todo/$app"
   ENV_FILE="$APP_DIR/.env"
 
   if [ ! -f "$ENV_FILE" ]; then
