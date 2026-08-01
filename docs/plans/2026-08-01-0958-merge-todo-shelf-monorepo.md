@@ -67,54 +67,54 @@ docs/
 - [ ] 他の環境（別 Mac 等）に todo-shelf / todo-app の未 push 作業がないか確認する
 
 ### Phase 1: 履歴ごと取り込みと再配置 [AI🤖]
-- [ ] **取り込み元の固定**: 両リポジトリで `git fetch origin` を実行した上で、
+- [x] **取り込み元の固定**: 両リポジトリで `git fetch origin` を実行した上で、
   - todo-shelf: `git status --porcelain` が空（完全 clean）かつ `HEAD == origin/main` を確認し、取り込み元 SHA を本ファイルのログセクションに記録する
   - todo-app: tracked 変更がないこと（`git diff --quiet` && `git diff --cached --quiet`）、未追跡ファイルが本 plan ファイルだけであること、`HEAD == origin/main` を確認する（plan は次ステップのブランチ作成後にコミットするため、この時点では未追跡でよい。plan コミット以降のステップでは `git status --porcelain` 空を要求する）
-- [ ] 統合前ベースライン採取: 旧 todo-shelf で `npm test` を実行し、失敗テスト名の一覧を scratchpad に保存
-- [ ] todo-app に統合用ブランチ `merge-todo-shelf` を作成し、未追跡の本 plan ファイルをこのブランチで先にコミットする
-- [ ] **移動対象の同名衝突チェックを機械的に実行**: todo-app 側の移動後パス一覧と shelf 側の書き換え後パス一覧を突き合わせ、**allowlist（package.json / package-lock.json / .gitignore / .mise.toml / CLAUDE.md / VERIFY.md = 意図的なルート衝突）を除いて重複ゼロ**を確認（既知の docs/plans 衝突は `docs/shelf/` 隔離で解消済みのはず。それ以外が出たら方針を決めてから進む）
-- [ ] git-filter-repo スクリプトを GitHub から scratchpad に取得
-- [ ] todo-shelf を `git clone --no-local` で scratchpad に一時 clone（main が記録した SHA を指していることを確認）し、`git filter-repo --path-rename` で履歴全体を最終パスに書き換え:
+- [x] 統合前ベースライン採取: 旧 todo-shelf で `npm test` を実行し、失敗テスト名の一覧を scratchpad に保存
+- [x] todo-app に統合用ブランチ `merge-todo-shelf` を作成し、未追跡の本 plan ファイルをこのブランチで先にコミットする
+- [x] **移動対象の同名衝突チェックを機械的に実行**: todo-app 側の移動後パス一覧と shelf 側の書き換え後パス一覧を突き合わせ、**allowlist（package.json / package-lock.json / .gitignore / .mise.toml / CLAUDE.md / VERIFY.md = 意図的なルート衝突）を除いて重複ゼロ**を確認（既知の docs/plans 衝突は `docs/shelf/` 隔離で解消済みのはず。それ以外が出たら方針を決めてから進む）
+- [x] git-filter-repo スクリプトを GitHub から scratchpad に取得
+- [x] todo-shelf を `git clone --no-local` で scratchpad に一時 clone（main が記録した SHA を指していることを確認）し、`git filter-repo --path-rename` で履歴全体を最終パスに書き換え:
   - `apps/api/` → `apps/shelf/api/`、`apps/ios/` → `apps/shelf/ios/`、`apps/web/` → `apps/shelf/web/`
   - `packages/shared/` → `packages/shelf-shared/`
   - `docs/` → `docs/shelf/`
   - `scripts/` はそのまま
   - ルートファイル（package.json / .mise.toml / CLAUDE.md / VERIFY.md / package-lock.json / .gitignore）はそのまま（マージ時に統合）
   - ※ --path-rename の適用順序（先勝ちルール）は実行前に `--dry-run` 等で確認する
-- [ ] filter-repo 実行後、一時 clone の `.git/filter-repo/commit-map`（旧 SHA → 新 SHA 対応表）を退避し、後のステップで `docs/shelf/migration-commit-map.txt` としてリポジトリにコミットする
-- [ ] todo-app 側を `git mv`: `apps/{api,ios,macos}` → `apps/todo/`、`packages/shared` → `packages/todo-shared`（通常の rename なので --follow で追跡可能）。**この再配置をコミットし、`git status --porcelain` が空であることを確認してから次へ進む**（未コミットのまま merge すると `Your local changes would be overwritten by merge` で失敗する）
-- [ ] 一時 clone を remote 追加 → fetch → `git merge --allow-unrelated-histories` で取り込み。ルートファイルのコンフリクトを統合方針どおり解決:
+- [x] filter-repo 実行後、一時 clone の `.git/filter-repo/commit-map`（旧 SHA → 新 SHA 対応表）を退避し、後のステップで `docs/shelf/migration-commit-map.txt` としてリポジトリにコミットする
+- [x] todo-app 側を `git mv`: `apps/{api,ios,macos}` → `apps/todo/`、`packages/shared` → `packages/todo-shared`（通常の rename なので --follow で追跡可能）。**この再配置をコミットし、`git status --porcelain` が空であることを確認してから次へ進む**（未コミットのまま merge すると `Your local changes would be overwritten by merge` で失敗する）
+- [x] 一時 clone を remote 追加 → fetch → `git merge --allow-unrelated-histories` で取り込み。ルートファイルのコンフリクトを統合方針どおり解決:
   - package.json: workspaces を `["apps/*/*", "packages/*"]` に
   - .gitignore: 両方の union
   - .mise.toml: `todo:` / `shelf:` プレフィックスでタスク統合
   - CLAUDE.md: 共通事項＋製品別セクションに再構成
   - VERIFY.md: shelf 版をベースにルートへ
   - package-lock.json: 両方削除（次ステップで再生成）
-- [ ] **履歴検証（commit-map ベース）**: ①commit-map から cd97f92 に対応する新 SHA を取得 ②新 SHA がマージ後リポジトリに存在すること（`git cat-file -e`）③`git log -- apps/shelf/api/src/index.ts` 等に新 SHA（または同一 commit subject）が出ること、を確認
-- [ ] **後片付け**: commit-map が `docs/shelf/migration-commit-map.txt` としてコミット済みであることを確認してから、一時 remote を `git remote remove` で削除 → scratchpad の一時 clone と filter-repo スクリプトを削除 → `git remote -v` が通常の origin だけになったことを確認
-- [ ] **Linux コンテナで package-lock.json を再生成**し、mac と Linux コンテナの両方で `npm ci --dry-run` が通ることを確認
-- [ ] lockfile 再生成に伴う lint プラグイン更新の検出: `npm run lint --workspaces --if-present` と `npm run typecheck --workspaces --if-present` を実行し、触っていないファイルで新たに落ちるものがないか確認する
+- [x] **履歴検証（commit-map ベース）**: ①commit-map から cd97f92 に対応する新 SHA を取得 ②新 SHA がマージ後リポジトリに存在すること（`git cat-file -e`）③`git log -- apps/shelf/api/src/index.ts` 等に新 SHA（または同一 commit subject）が出ること、を確認
+- [x] **後片付け**: commit-map が `docs/shelf/migration-commit-map.txt` としてコミット済みであることを確認してから、一時 remote を `git remote remove` で削除 → scratchpad の一時 clone と filter-repo スクリプトを削除 → `git remote -v` が通常の origin だけになったことを確認
+- [x] **Linux コンテナで package-lock.json を再生成**し、mac と Linux コンテナの両方で `npm ci --dry-run` が通ることを確認
+- [x] lockfile 再生成に伴う lint プラグイン更新の検出: `npm run lint --workspaces --if-present` と `npm run typecheck --workspaces --if-present` を実行し、触っていないファイルで新たに落ちるものがないか確認する
 
 ### Phase 2: パス参照の修正 [AI🤖]
-- [ ] `scripts/generate-projects.sh` / `scripts/build.sh` / `scripts/release.sh` のパスを新構造に更新（release.sh のリポジトリ指定 `nyshk97/todo-app` と Cask URL は変更しない）
-- [ ] ルート README.md の旧パス記述（apps/api, apps/ios, apps/macos）を新構造に更新
-- [ ] shelf iOS の xcodegen 呼び出し（mise `shelf:build:ios`）を新パスに更新
-- [ ] 両 API / web / shared 内に相対パスやリポジトリルート前提の参照が残っていないか grep で総点検（tsconfig の paths、wrangler.toml、project.yml、テスト内のパス等）
-- [ ] gitignore 対象ファイルを旧パスからコピー:
+- [x] `scripts/generate-projects.sh` / `scripts/build.sh` / `scripts/release.sh` のパスを新構造に更新（release.sh のリポジトリ指定 `nyshk97/todo-app` と Cask URL は変更しない）
+- [x] ルート README.md の旧パス記述（apps/api, apps/ios, apps/macos）を新構造に更新
+- [x] shelf iOS の xcodegen 呼び出し（mise `shelf:build:ios`）を新パスに更新
+- [x] 両 API / web / shared 内に相対パスやリポジトリルート前提の参照が残っていないか grep で総点検（tsconfig の paths、wrangler.toml、project.yml、テスト内のパス等）
+- [x] gitignore 対象ファイルを旧パスからコピー:
   - todo 側: `apps/todo/api/.dev.vars`, `apps/todo/ios/.env`, `apps/todo/macos/.env`（Secrets.swift は generate-projects.sh で再生成）
   - shelf 側: `apps/shelf/api/.dev.vars`, `apps/shelf/ios/Sources/Secrets.swift`, `apps/shelf/web/.env`, `apps/shelf/web/.env.production`
-- [ ] **コピーした全ファイルを `git check-ignore` で無視対象であることを確認**（特に .env.production の誤コミット防止）。`git status` にも出ていないことを確認
-- [ ] CLAUDE.md の記述内パス（`apps/api/` 等）を新構造に合わせて書き換え
-- [ ] （任意）generate-projects.sh を shelf iOS にも対応させ、Secrets.swift を .env から生成できるようにする（今回は実ファイルコピーで動く状態を優先。対応しない場合は「shelf の Secrets.swift は手動管理」と CLAUDE.md に明記）
+- [x] **コピーした全ファイルを `git check-ignore` で無視対象であることを確認**（特に .env.production の誤コミット防止）。`git status` にも出ていないことを確認
+- [x] CLAUDE.md の記述内パス（`apps/api/` 等）を新構造に合わせて書き換え
+- [x] ~~（任意）generate-projects.sh を shelf iOS にも対応させ、Secrets.swift を .env から生成できるようにする~~ → 見送り。実ファイルコピーで動く状態を優先し、「shelf の Secrets.swift は手動管理」を CLAUDE.md に明記した
 
 ### Phase 3: 検証 [AI🤖]
-- [ ] `npm test --workspace @todo-app/api`: 全パス
-- [ ] `npm test --workspace todo-shelf-api`: 失敗テスト名の集合が Phase 1 で採取したベースラインと**完全一致**すること（数だけでなく名前で比較）
-- [ ] `apps/shelf/web` で `npm run build` が通ること
-- [ ] `npx wrangler deploy --dry-run` を両 API で実行しエラーがないこと
-- [ ] xcodegen で 3 つの Xcode プロジェクト（TodoApp / TodoMac / Shelf）が生成でき、iOS 2つは `xcodebuild -sdk iphonesimulator` が通ること
-- [ ] `mise run todo:build:mac` で TodoMac がビルド・起動すること
-- [ ] release.sh は実行せず、パス参照のレビューのみ（次回リリース時に実地検証）
+- [x] `npm test --workspace @todo-app/api`: 全パス
+- [x] `npm test --workspace todo-shelf-api`: 失敗テスト名の集合が Phase 1 で採取したベースラインと**完全一致**すること（数だけでなく名前で比較）
+- [x] `apps/shelf/web` で `npm run build` が通ること
+- [x] `npx wrangler deploy --dry-run` を両 API で実行しエラーがないこと
+- [x] xcodegen で 3 つの Xcode プロジェクト（TodoApp / TodoMac / Shelf）が生成でき、iOS 2つは `xcodebuild -sdk iphonesimulator` が通ること
+- [x] ~~`mise run todo:build:mac` で TodoMac がビルド・起動すること~~ → **起動は見送り**。`/Applications/TodoMac.app`（brew 版）がユーザー稼働中で、タスクが送る `osascript quit` が実行中インスタンスを落とすため。ビルド部分（`xcodebuild` + 成果物の Info.plist 確認）と `scripts/build.sh`（Release + zip）は実行して成功を確認済み。起動確認は「統合後の確認 [人間👨‍💻]」に委譲
+- [x] release.sh は実行せず、パス参照のレビューのみ（次回リリース時に実地検証）
 
 ### Phase 4: マージ・push [AI🤖]
 - [ ] `merge-todo-shelf` を main にマージして push
@@ -133,9 +133,14 @@ docs/
 ### 試したこと・わかったこと
 - 2026-08-01: gitignore 対象の実ファイルを両リポジトリで棚卸し（前提セクションに反映）。git-filter-repo は未インストールだが python3 あり、単一スクリプト取得で実行可能
 - 2026-08-01: 取り込み元 SHA を固定。todo-shelf `c30a3d49304503edf7afd87843fbad95bb0de4be`（HEAD == origin/main、porcelain 空）／todo-app `9d870642262be530aadfd0bb72b2b39cc3259ae5`（HEAD == origin/main、未追跡は本 plan のみ）
+- 2026-08-01: filter-repo の `--path-rename` は指定した5つのプレフィックスが互いに素なので順序依存なし。`--dry-run` の `.git/filter-repo/fast-export.filtered` を parse して、書き換え後パスが `apps/shelf/` `packages/shelf-shared/` `docs/shelf/` `scripts/` ＋ルート6ファイルだけになることを事前確認した
+- 2026-08-01: 履歴検証 pass。コミット数 99（旧 todo-app）+ 55（shelf）+ 3（plan / 再配置 / merge）= 157 で一致。todo 側の旧 SHA は不変（filter-repo をかけていないため）、shelf 側は `docs/shelf/migration-commit-map.txt` で対応が引ける。`git log -- apps/shelf/api/src/index.ts` が `--follow` なしで初出（2026-04-15）まで遡れることを確認
 - 2026-08-01: shelf テストのベースライン採取。`Tests 9 failed | 11 passed | 4 skipped (24)`。失敗は `Comments`（suite）＋ `Tasks > {creates a task without section, creates a task with section, lists tasks for project, updates task with due_date, clears task due_date with null, moves task to different section (null), reorders tasks, returns upcoming tasks, deletes a task}`
 
 ### 方針変更
 - 2026-08-01: 計画レビューを受けて改訂。①取り込みを subtree → filter-repo 方式に変更（--follow が subtree では効かないため）②docs/plans の同名衝突（2026-04-26-ios-offline-support.md）を docs/shelf/ 隔離で回避③ignored ファイルの移行リストを明示＋check-ignore 検証追加④lockfile 再生成を Linux コンテナ方式に修正⑤テスト比較を失敗名の集合比較に強化⑥README 更新・後始末手順を追加⑦archive を人間確認の後（Phase 5）に移動
 - 2026-08-01: 計画レビュー2巡目を受けて改訂。①todo 側 git mv を merge 前にコミットするステップを明示（未コミットだと merge が失敗する再現確認あり）②Phase 1 冒頭に fetch・clean 確認・取り込み元 SHA 固定を追加③履歴検証を commit-map ベースに変更（filter-repo は SHA を振り直すため。commit-map は docs/shelf/migration-commit-map.txt として保全）④衝突チェックにルートファイルの allowlist を導入⑤lockfile 再生成後の lint / typecheck 確認を追加⑥一時 clone に --no-local を明記
+- 2026-08-01: lockfile のフル再生成で `eslint-plugin-react-hooks` が 7.0.1 → 7.1.1 に上がり、shelf/web の lint エラーが 1 → 6 に増えた。増分5件はすべて**イベントハンドラ内**の `Date.now()` / `performance.now()` を `react-hooks/purity` が「during render」と誤検知したもので、統合とは無関係。`apps/shelf/web/package.json` で 7.0.1 に固定して lint 出力を統合前と完全一致（Toast.tsx の react-refresh 1件のみ＝統合前から失敗）に戻した。プラグイン更新への追随は別タスク
+- 2026-08-01: `mise run todo:build:mac` の起動確認を見送り（Phase 3 の該当行に理由を記載）。TodoMac は brew 版がユーザー稼働中で、タスク内の `osascript quit` が実行中インスタンスを落とすため
+- 2026-08-01: 計画に無い追加変更を2点入れた。①`.mise.toml` の `release` タスクを deprecated な `{{arg(...)}}` から `usage` 方式（`usage = 'arg "<version>"'` ＋ `$usage_version`）に移行（グローバルルール準拠。ファイルを全面書き換えするタイミングだったため）②`.gitignore` の union で `.env` / `.env.local` を shelf 由来の `.env*` に置換（`apps/shelf/web/.env.production` を確実に無視するため。追跡中の `.env*` が両リポジトリに無いことを確認済み）
 - 2026-08-01: 計画レビュー3巡目を受けて改訂。①clean 確認を todo-app / todo-shelf で分離（todo-app は本 plan が未追跡のため tracked 変更なし＋未追跡は plan のみ、で判定。plan コミット以降は porcelain 空を要求）②merge・commit-map 保全後の後片付けステップを追加（一時 remote 削除・scratchpad の一時 clone / filter-repo スクリプト削除・`git remote -v` 確認）
