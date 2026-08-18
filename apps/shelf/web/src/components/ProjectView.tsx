@@ -207,6 +207,9 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   const [addingSectionName, setAddingSectionName] = useState("");
   const [showAddSection, setShowAddSection] = useState(false);
   const dragTypeRef = useRef<"section" | "task" | null>(null);
+  // ドラッグ開始時のタスク一覧。onDragOver が楽観的に section_id を書き換えるため、
+  // キャンセル時の巻き戻しと「実際に変化があったか」の判定に使う
+  const dragSnapshotRef = useRef<Task[] | null>(null);
   const { showToast } = useToast();
 
   const sensors = useSensors(
@@ -302,6 +305,13 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
   const handleDragStart = (event: DragStartEvent) => {
     const { type } = parseDragId(String(event.active.id));
     dragTypeRef.current = type === "section" || type === "task" ? type : null;
+    dragSnapshotRef.current = type === "task" ? tasks : null;
+  };
+
+  const handleDragCancel = () => {
+    dragTypeRef.current = null;
+    if (dragSnapshotRef.current) setTasks(dragSnapshotRef.current);
+    dragSnapshotRef.current = null;
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -342,7 +352,13 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     const { active, over } = event;
     const currentDragType = dragTypeRef.current;
     dragTypeRef.current = null;
-    if (!over || active.id === over.id) return;
+    const snapshot = dragSnapshotRef.current;
+    dragSnapshotRef.current = null;
+
+    // タスクは onDragOver で section_id を楽観的に書き換え済みのため、
+    // over が自分自身でも「セクション跨ぎ移動の確定」でありここで終わってはいけない。
+    // 早期 return できるのはセクション並べ替えだけ
+    if (currentDragType !== "task" && (!over || active.id === over.id)) return;
 
     if (currentDragType === "section") {
       // Section reordering
@@ -358,13 +374,25 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
       setSections(reordered);
       const items = reordered.map((s, i) => ({ id: s.id, position: i }));
       // 書き込み完了前に refetch すると古い並びで上書きされるので、成功後に invalidate する
-      api.patch(`/projects/${projectId}/sections/reorder`, { items }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["sections"] });
-      });
+      api
+        .patch(`/projects/${projectId}/sections/reorder`, { items })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["sections"] });
+        })
+        .catch(() => {
+          setSections(sections);
+          showToast("セクションの並べ替えに失敗しました");
+        });
       return;
     }
 
     if (currentDragType === "task") {
+      // ドロップ先なし: onDragOver の楽観的変更を巻き戻す
+      if (!over) {
+        if (snapshot) setTasks(snapshot);
+        return;
+      }
+
       const activeInfo = parseDragId(String(active.id));
       const overInfo = parseDragId(String(over.id));
       if (activeInfo.type !== "task") return;
@@ -394,6 +422,18 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         reordered = [...withoutActive, activeTask];
       }
 
+      // その場に置き直しただけ（セクションも並びも変化なし）なら API を呼ばない
+      if (snapshot) {
+        const before = snapshot
+          .filter((t) => t.section_id === targetSectionId)
+          .sort((a, b) => a.position - b.position)
+          .map((t) => t.id);
+        const after = reordered.map((t) => t.id);
+        if (before.length === after.length && before.every((id, i) => id === after[i])) {
+          return;
+        }
+      }
+
       // Build reorder items with section_id
       const reorderItems = reordered.map((t, i) => ({
         id: t.id,
@@ -414,9 +454,15 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         return [...others, ...updated];
       });
 
-      api.patch("/tasks/reorder", { items: reorderItems }).then(() => {
-        queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
-      });
+      api
+        .patch("/tasks/reorder", { items: reorderItems })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+        })
+        .catch(() => {
+          if (snapshot) setTasks(snapshot);
+          showToast("タスクの移動に失敗しました");
+        });
     }
   };
 
@@ -441,6 +487,7 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <SectionView
           section={null}
