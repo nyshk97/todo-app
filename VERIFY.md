@@ -91,12 +91,79 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $SECR
 
 ## macOS アプリ
 
-- ビルド＆起動: `mise run todo:build:mac`
+- 開発用のビルド＆起動: `mise run todo:build:mac`（未署名。配布物ではない）
+
+### 署名まわりだけ確認する（notarize を飛ばす・1 分程度）
+
+```bash
+mise run todo:build:sign-only
+```
+
+- `==> 署名 OK（adhoc でない / Team VYDUR99LAM / timestamp あり / runtime / get-task-allow なし）` が出ること
+- **`build/TodoMac.zip` が作られていないこと**（`ls build/`）。このモードは配布 ZIP を作らない。
+  作ってしまうと未検証の成果物が後段（release）に拾われる
+
+署名属性を自分の目で見るなら:
+
+```bash
+APP=build/derived/Build/Products/Release/TodoMac.app
+codesign -dvv "$APP" 2>&1 | grep -E "Signature|TeamIdentifier|Timestamp|flags"
+codesign -d --entitlements - "$APP"   # get-task-allow が出ないこと
+```
+
+### 成果物が中途半端に残らないことの確認
+
+notarize は途中で落ちる工程が多いので、失敗しても `build/TodoMac.zip` を残さない作りになっている。
+存在しないプロファイルを渡すと安全に再現できる:
+
+```bash
+NOTARY_PROFILE=nonexistent-profile-for-test bash scripts/build.sh; echo "exit=$?"
+ls build/*.zip
+```
+
+`exit=1` で終わり、ZIP が 1 つも無いこと（提出用の `TodoMac-notarize.zip` も `trap` で消える）。
+
+### Gatekeeper の確認（配布経路の模擬）
+
+`brew` 経由で入るアプリには quarantine 属性が付く。属性を付けた状態で起動できるかが staple の効き目そのもの。
+**常駐アプリなので、旧プロセスを終了して消えるのを待ってから差し替える**
+（残っていると `open` しても既存プロセスが前面化されるだけで「起動できた」と誤認する）。
+
+```bash
+STAGE=$(mktemp -d) && ditto -x -k build/TodoMac.zip "$STAGE"
+osascript -e 'tell application "TodoMac" to quit'
+until ! pgrep -x TodoMac >/dev/null; do sleep 1; done
+rm -rf /Applications/TodoMac.app && ditto "$STAGE/TodoMac.app" /Applications/TodoMac.app
+xattr -w com.apple.quarantine "0081;$(printf %x $(date +%s));Safari;$(uuidgen)" /Applications/TodoMac.app
+open /Applications/TodoMac.app && pgrep -x TodoMac
+spctl --assess --type execute -vv /Applications/TodoMac.app   # source=Notarized Developer ID
+```
+
+Gatekeeper のダイアログが出ずに起動すれば pass。**確認後は属性を消して起動し直す**
+（付いたままだと App Translocation で `/private/var/folders/.../AppTranslocation/` から実行され続ける）:
+
+```bash
+osascript -e 'tell application "TodoMac" to quit'
+until ! pgrep -x TodoMac >/dev/null; do sleep 1; done
+xattr -d com.apple.quarantine /Applications/TodoMac.app
+open /Applications/TodoMac.app
+ps -o pid,comm -p "$(pgrep -x TodoMac | head -1)"   # /Applications/... から動いていること
+```
+
+最後にメニューバーから開いてタスクが取得できる（サーバー同期が通る）ことを目視で確認する。
 
 ## リリース
 
-- ビルド: `mise run todo:build`
-- リリース作成: `mise run todo:release -- <version>`
+- 配布用ビルド: `mise run todo:build`（署名 + notarize + staple + 配布 ZIP の検証。数分かかる）
+  - `status: Accepted` / `The staple and validate action worked!` /
+    配布 ZIP を展開しての `spctl --assess` → `source=Notarized Developer ID` が全部出ること
+- リリース作成: `mise run todo:release -- <version>`（**実行すると即公開される**）
+  - notarize を commit/push より前に通す。失敗しても remote には何も反映されず、
+    `git checkout apps/todo/macos/project.yml` で戻せる
+
+**`xcrun notarytool history --keychain-profile nyshk97-notary` が通らないときは画面ロックを疑う**
+（資格情報は data-protection keychain にあり、ロック中は「プロファイルが無い」ように見える）。
+判定は `ioreg -n Root -d1 -a | plutil -extract IOConsoleLocked xml1 -o - -` が `<true/>` かどうか。
 
 ---
 

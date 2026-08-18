@@ -26,11 +26,15 @@ description = "todo: 本番 DB にマイグレーション適用"
 run = "cd apps/todo/api && npx wrangler d1 migrations apply todo-app-db --remote"
 
 [tasks."todo:build"]
-description = "todo: macOS アプリを Release ビルド"
+description = "todo: 配布用ビルド (Release ビルド → Developer ID 署名 → notarize → staple → build/TodoMac.zip)。数分かかる"
 run = "bash scripts/build.sh"
 
+[tasks."todo:build:sign-only"]
+description = "todo: 署名まわりだけ確認する (notarize を飛ばして署名検証で終了。配布 ZIP は作らない)"
+run = "bash scripts/build.sh --skip-notarize"
+
 [tasks."todo:release"]
-description = "todo: GitHub Release 作成 (例: mise run todo:release -- 1.2.0)"
+description = "todo: GitHub Release 作成 (例: mise run todo:release -- 1.2.0)。**実行すると即公開される**。notarize を push より前に通す"
 usage = 'arg "<version>"'
 run = "bash scripts/release.sh $usage_version"
 
