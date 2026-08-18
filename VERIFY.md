@@ -253,6 +253,43 @@ VITE_API_URL=https://todo-shelf-api.d0ne1s-todo.workers.dev npm run dev -- --hos
 - `http://127.0.0.1:5173/` をブラウザで開き、対象 UI を目視確認できれば pass
 - API データが必要な確認では、データ作成や削除を伴わない操作に留める
 
+### D&D（dnd-kit）の回帰確認
+
+D&D まわり（ProjectView のドラッグハンドラ、collision detection）を変更したときに確認する。
+**「UI 上動いて見えるか」ではなく「永続化リクエストが飛んだか」を判定基準にする**（onDragOver の楽観的更新だけで見た目は成功するため）。
+
+```bash
+# ドラッグは eval で PointerEvent を合成する（dnd-kit の PointerSensor は合成イベントでも動く）。
+# ⠿ ハンドルに pointerdown → 5px 超の pointermove を数回（各 80〜100ms 空ける）→ pointerup
+agent-browser --session verify eval --stdin <<'EVALEOF'
+(async () => {
+  const spans = () => Array.from(document.querySelectorAll("span"));
+  const titleSpan = spans().find((s) => s.textContent === "<ドラッグするタスク名>");
+  const handle = Array.from(titleSpan.parentElement.children).find((c) => c.textContent === "⠿");
+  const r = handle.getBoundingClientRect();
+  const sx = r.x + r.width / 2, sy = r.y + r.height / 2;
+  const tx = <ドロップ先x>, ty = <ドロップ先y>;  // 移動先セクションの「タスクを追加」ボタンの getBoundingClientRect() 等から取る
+  const fire = (type, tgt, x, y) => tgt.dispatchEvent(new PointerEvent(type, {
+    bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse",
+    isPrimary: true, button: type === "pointermove" ? -1 : 0, buttons: 1, clientX: x, clientY: y }));
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  fire("pointerdown", handle, sx, sy);
+  await sleep(50);
+  for (let i = 1; i <= 6; i++) { fire("pointermove", document, sx + (tx-sx)*i/6, sy + (ty-sy)*i/6); await sleep(100); }
+  fire("pointerup", document, tx, ty);
+  await sleep(500);
+  return "done";
+})()
+EVALEOF
+# 永続化の裏取り: PATCH が飛んで 2xx か
+agent-browser --session verify network requests --method PATCH
+```
+
+- 確認パターン: ①別タスクの真上へのドロップ ②**移動先セクション末尾の空き領域へのドロップ**（over が自分自身になる経路。2026-08-18 のバグはここだけ PATCH が飛ばなかった）③その場に置き直し（PATCH が飛ばないこと）
+- ドロップ後にリロードして配置が維持されていれば pass。UI 上移動して見えても PATCH が無ければ fail
+- 失敗パスは `network route "**/tasks/reorder" --abort` で遮断してからドラッグし、トースト表示＋元の位置への巻き戻しを確認する
+- ローカル DB が空なら `npx wrangler d1 migrations apply todo-shelf-db --local` 後にプロジェクト・セクション・タスクを INSERT して使う
+
 ### キャッシュ層（TanStack Query）の回帰確認
 
 キャッシュまわり（クエリキー、invalidate、persister 設定）を変更したときに確認する。agent-browser で:

@@ -171,6 +171,7 @@ docs/
 
 - 複数コンテナ間 D&D では `closestCenter` ではなくカスタム collision detection を使い、タスク要素を droppable ゾーンより優先する
 - 同一コンテナ内の並べ替えは `arrayMove` を使う（手動 splice はドラッグ方向でズレる）
+- コンテナ跨ぎ D&D で `onDragOver` が section_id を楽観的に書き換える構成では、ドロップ時の `over` が**自分自身**になり得る（空き領域に落とすと移動済みの自分の行がポインタ直下に来る）。`onDragEnd` で `active.id === over.id` を早期 return するとコンテナ跨ぎ移動が永続化されず「見た目は成功・リロードで戻る」になる。早期 return はセクション並べ替え側だけに限定し、タスク側はドラッグ開始時 snapshot と比較して no-op 判定する（2026-08-18 の本番バグの原因）。あわせて永続化 API には `.catch`（snapshot への巻き戻し＋トースト）と `onDragCancel` を必ず付ける
 
 ## iOS
 
