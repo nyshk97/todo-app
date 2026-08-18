@@ -355,12 +355,8 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     const snapshot = dragSnapshotRef.current;
     dragSnapshotRef.current = null;
 
-    // タスクは onDragOver で section_id を楽観的に書き換え済みのため、
-    // over が自分自身でも「セクション跨ぎ移動の確定」でありここで終わってはいけない。
-    // 早期 return できるのはセクション並べ替えだけ
-    if (currentDragType !== "task" && (!over || active.id === over.id)) return;
-
     if (currentDragType === "section") {
+      if (!over || active.id === over.id) return;
       // Section reordering
       const activeInfo = parseDragId(String(active.id));
       const overInfo = parseDragId(String(over.id));
@@ -387,7 +383,8 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
     }
 
     if (currentDragType === "task") {
-      // ドロップ先なし: onDragOver の楽観的変更を巻き戻す
+      // ドロップ先なし: onDragOver の楽観的変更を巻き戻す。
+      // over が自分自身のケースはセクション跨ぎ移動の確定であり得るため、ここで終わらず続行する
       if (!over) {
         if (snapshot) setTasks(snapshot);
         return;
