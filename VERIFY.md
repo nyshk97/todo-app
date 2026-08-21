@@ -157,7 +157,7 @@ ps -o pid,comm -p "$(pgrep -x TodoMac | head -1)"   # /Applications/... から�
 - 配布用ビルド: `mise run todo:build`（署名 + notarize + staple + 配布 ZIP の検証。数分かかる）
   - `status: Accepted` / `The staple and validate action worked!` /
     配布 ZIP を展開しての `spctl --assess` → `source=Notarized Developer ID` が全部出ること
-- リリース作成: `mise run todo:release [patch|minor|major|x.y.z]`（**実行すると即公開される**。Claude Code のセッションから叩いてよい）
+- リリース作成: `mise run release:todo [patch|minor|major|x.y.z]`（**実行すると即公開される**。Claude Code のセッションから叩いてよい）
   - notarize を push より前に通す。push 前に失敗したら bump commit は trap で巻き戻り、remote も作業ツリーも元に戻る
   - **リリースノートは `apps/todo/macos/CHANGELOG.md` の `[Unreleased]` から作る**（GitHub Release の本文と Sparkle の更新ダイアログの両方）。
     叩く前にセッションが `git log <前回タグ>..HEAD -- apps/todo/macos packages/todo-shared` を読んで埋めて commit する。

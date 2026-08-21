@@ -2,7 +2,7 @@
 
 TodoMac（macOS 版 todo アプリ）の更新履歴。iOS 版と API は対象外。形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) ベース、バージョニングは [SemVer](https://semver.org/lang/ja/)。
 
-`scripts/release.sh`（`mise run todo:release`）が `[Unreleased]` を `[X.Y.Z] - YYYY-MM-DD` に切り出し、そのセクションを GitHub Release のノートと Sparkle の更新ダイアログ（appcast の `<description>`）の両方に流し込む。ここが唯一の源。
+`scripts/release.sh`（`mise run release:todo`）が `[Unreleased]` を `[X.Y.Z] - YYYY-MM-DD` に切り出し、そのセクションを GitHub Release のノートと Sparkle の更新ダイアログ（appcast の `<description>`）の両方に流し込む。ここが唯一の源。
 
 ## 書き方
 

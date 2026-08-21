@@ -101,5 +101,5 @@ mise run shelf:build:ios     # iOS を Xcode で開く
 
 ```bash
 mise run todo:build              # macOS アプリをビルド
-mise run todo:release -- 1.x.0   # GitHub Release 作成
+mise run release:todo [patch|minor|major|x.y.z]   # リリース（既定 patch）
 ```

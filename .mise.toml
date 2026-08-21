@@ -1,4 +1,5 @@
 # 製品固有のタスクだけ todo: / shelf: のプレフィックスを付ける。
+# 例外: リリースは他の自作 Mac アプリと入口を揃えて release:<app>（release:todo）。
 # 両製品にまたがるタスク（generate = 3つの Xcode プロジェクト生成）はプレフィックスなし。
 # todo  = 今日やるタスク管理（apps/todo/{api,ios,macos}）
 # shelf = あとでやるタスク管理（apps/shelf/{api,ios,web}）
@@ -33,7 +34,7 @@ run = "bash scripts/build.sh"
 description = "todo: 署名まわりだけ確認する (notarize を飛ばして署名検証で終了。配布 ZIP は作らない)"
 run = "bash scripts/build.sh --skip-notarize"
 
-[tasks."todo:release"]
+[tasks."release:todo"]
 description = "todo: リリース（bump → CHANGELOG 切り出し → build → notarize → GitHub Release + appcast → cask 更新）。**実行すると即公開される**。叩く前に apps/todo/macos/CHANGELOG.md の [Unreleased] を埋めて commit しておく（空なら止まる）。Claude Code から叩いてよい"
 usage = 'arg "<bump>" help="patch|minor|major|x.y.z" default="patch"'
 run = 'bash scripts/release.sh "$usage_bump"'
