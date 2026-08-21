@@ -28,6 +28,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Sparkle を起動時に立ち上げる（自動チェックのスケジュールが走る）
+        _ = Updater.shared
 
         // フローティングパネル
         let contentView = NSHostingView(rootView: PanelContentView(onClose: { [weak self] in
@@ -145,6 +147,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let versionItem = NSMenuItem(title: "v\(version)", action: nil, keyEquivalent: "")
             versionItem.isEnabled = false
             menu.addItem(versionItem)
+            let updateItem = NSMenuItem(title: "アップデートを確認…", action: #selector(Updater.checkForUpdates), keyEquivalent: "")
+            // メニューは項目を自動で有効化するので、target を nil にしてグレーアウトさせる
+            updateItem.target = (Updater.isSupported && Updater.shared.canCheckForUpdates) ? Updater.shared : nil
+            menu.addItem(updateItem)
             menu.addItem(NSMenuItem.separator())
             if !AXIsProcessTrusted() {
                 menu.addItem(NSMenuItem(title: "アクセシビリティ権限を許可...", action: #selector(requestAccessibilityPermission), keyEquivalent: ""))

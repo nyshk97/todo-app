@@ -31,3 +31,6 @@ build/
 
 # Generated secrets
 Secrets.swift
+
+# XcodeGen が生成する Info.plist
+apps/*/macos/Generated/

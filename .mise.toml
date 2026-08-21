@@ -34,9 +34,9 @@ description = "todo: 署名まわりだけ確認する (notarize を飛ばして
 run = "bash scripts/build.sh --skip-notarize"
 
 [tasks."todo:release"]
-description = "todo: GitHub Release 作成 (例: mise run todo:release -- 1.2.0)。**実行すると即公開される**。notarize を push より前に通す"
-usage = 'arg "<version>"'
-run = "bash scripts/release.sh $usage_version"
+description = "todo: リリース（bump → CHANGELOG 切り出し → build → notarize → GitHub Release + appcast → cask 更新）。**実行すると即公開される**。叩く前に apps/todo/macos/CHANGELOG.md の [Unreleased] を埋めて commit しておく（空なら止まる）。Claude Code から叩いてよい"
+usage = 'arg "<bump>" help="patch|minor|major|x.y.z" default="patch"'
+run = 'bash scripts/release.sh "$usage_bump"'
 
 [tasks."todo:build:ios"]
 description = "todo: iOS アプリを Xcode で開く (実機接続後 Cmd+R でインストール)"

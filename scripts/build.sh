@@ -86,22 +86,51 @@ xcodebuild build \
 
 # ===== 配布用に再署名 =====
 # entitlements を渡さない（= 空）ことで get-task-allow を落とす。
-# このアプリは entitlement 不要（sandbox 無効・特別な権限なし）で、埋め込み framework も無い。
+# このアプリは entitlement 不要（sandbox 無効・特別な権限なし）。埋め込み framework は Sparkle だけ。
+# xcodebuild は framework の外側しか署名し直さず、中の XPC・Updater.app・Autoupdate が adhoc の
+# まま残って notarize が Invalid になるので、inside-out に署名し直してから本体の seal を張り直す。
 echo "==> Signing (Hardened Runtime + secure timestamp)..."
+SPARKLE="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+SPARKLE_B="$SPARKLE/Versions/B"
+SPARKLE_NESTED=(
+  "$SPARKLE_B/XPCServices/Downloader.xpc"
+  "$SPARKLE_B/XPCServices/Installer.xpc"
+  "$SPARKLE_B/Updater.app"
+  "$SPARKLE_B/Autoupdate"
+  "$SPARKLE"
+)
+for nested in "${SPARKLE_NESTED[@]}"; do
+  [ -e "$nested" ] || { echo "NG: Sparkle の構成物が見つかりません: $nested" >&2; exit 1; }
+  # Sparkle の XPC はエンタイトルメントを持つため --preserve-metadata=entitlements で維持する
+  codesign --force --options runtime --timestamp \
+    --preserve-metadata=entitlements --sign "$SIGN_IDENTITY" "$nested"
+done
 codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_PATH"
 
 # ===== 署名検証（notarize の前提条件を全部見る）=====
 # codesign の出力は一旦変数に取ってから判定する。`codesign ... | grep -q` の直結は
 # grep -q のパイプ早期終了で codesign が SIGPIPE 終了し、pipefail 下で誤検知するため。
 echo "==> Verifying signature..."
-codesign --verify --strict --verbose=2 "$APP_PATH"
+codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
 fail=0
-info="$(codesign -dvv "$APP_PATH" 2>&1)"
-case "$info" in *"Signature=adhoc"*) echo "NG: adhoc 署名が残存" >&2; fail=1 ;; esac
-case "$info" in *"TeamIdentifier=$TEAM_ID"*) ;; *) echo "NG: TeamIdentifier が $TEAM_ID でない" >&2; fail=1 ;; esac
-case "$info" in *"Timestamp="*) ;; *) echo "NG: secure timestamp なし" >&2; fail=1 ;; esac
-case "$info" in *"(runtime"*) ;; *) echo "NG: Hardened Runtime が無効" >&2; fail=1 ;; esac
+for target in "${SPARKLE_NESTED[@]}" "$APP_PATH"; do
+  info="$(codesign -dvv "$target" 2>&1)"
+  case "$info" in *"Signature=adhoc"*) echo "NG: adhoc 署名が残存: $target" >&2; fail=1 ;; esac
+  case "$info" in *"TeamIdentifier=$TEAM_ID"*) ;; *) echo "NG: TeamIdentifier が $TEAM_ID でない: $target" >&2; fail=1 ;; esac
+  case "$info" in *"Timestamp="*) ;; *) echo "NG: secure timestamp なし: $target" >&2; fail=1 ;; esac
+  case "$info" in *"(runtime"*) ;; *) echo "NG: Hardened Runtime が無効: $target" >&2; fail=1 ;; esac
+done
+# Sparkle の配信先は project.yml（アプリが見に行く先）と release.sh（appcast を置く先）の
+# 2 箇所にある。成果物の plist を読んで突き合わせ、乖離したビルドを配布しない。
+FEED_URL="${FEED_URL:-https://github.com/nyshk97/todo-app/releases/latest/download/appcast.xml}"
+PLIST="$APP_PATH/Contents/Info.plist"
+built_feed="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$PLIST" 2>/dev/null || true)"
+if [ "$built_feed" != "$FEED_URL" ]; then
+  echo "NG: SUFeedURL が配信先と一致しない: plist='${built_feed}' 期待='${FEED_URL}'" >&2; fail=1
+fi
+built_key="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$PLIST" 2>/dev/null || true)"
+[ -n "$built_key" ] || { echo "NG: SUPublicEDKey が未設定" >&2; fail=1; }
 ent="$(codesign -d --entitlements - "$APP_PATH" 2>&1)"
 case "$ent" in *get-task-allow*) echo "NG: get-task-allow が残存（配布で禁止）" >&2; fail=1 ;; esac
 [ "$fail" -eq 0 ] || exit 1

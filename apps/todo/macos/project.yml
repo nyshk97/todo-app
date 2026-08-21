@@ -5,18 +5,43 @@ options:
     macOS: "14.0"
   xcodeVersion: "16.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.9.6"
+
 targets:
   TodoMac:
     type: application
     platform: macOS
     sources:
       - Sources
+    dependencies:
+      - package: Sparkle
+    # Info.plist は XcodeGen に生成させる（GENERATE_INFOPLIST_FILE だと SUFeedURL のような
+    # 任意キーを INFOPLIST_KEY_* で入れられない）。生成物は gitignore 対象。
+    info:
+      path: Generated/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Sparkle（アプリ内アップデート）。アップデータの起動は #if !DEBUG でガードし、
+        # feed URL も Release 構成にだけ入れる二重防御（Debug では TODOMAC_SU_FEED_URL が
+        # 未定義で空文字になる。Debug に feed を持たせると更新チェックで常用版に置き換わる）。
+        SUFeedURL: "$(TODOMAC_SU_FEED_URL)"
+        # keychain account "todo-mac" の秘密鍵と対（バックアップは Dropbox/secrets/sparkle-ed25519-todo-mac-private.key）
+        SUPublicEDKey: ZXZTCCgNK0ZSwZV2ZH1MQhMUZSQgpw3WP7yRhQYXUjY=
+        # 常駐アプリなので自動チェック ON（起動時 + 24h ごと）。同意ダイアログは出さない
+        SUEnableAutomaticChecks: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todomac
         MARKETING_VERSION: "1.17.1"
-        CURRENT_PROJECT_VERSION: 1
+        # Sparkle は CFBundleVersion で新旧比較する。release.sh がタイムスタンプに書き換える
+        CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER
-        GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_KEY_LSUIElement: true
+      configs:
+        Release:
+          TODOMAC_SU_FEED_URL: https://github.com/nyshk97/todo-app/releases/latest/download/appcast.xml

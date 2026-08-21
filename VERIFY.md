@@ -157,9 +157,21 @@ ps -o pid,comm -p "$(pgrep -x TodoMac | head -1)"   # /Applications/... から�
 - 配布用ビルド: `mise run todo:build`（署名 + notarize + staple + 配布 ZIP の検証。数分かかる）
   - `status: Accepted` / `The staple and validate action worked!` /
     配布 ZIP を展開しての `spctl --assess` → `source=Notarized Developer ID` が全部出ること
-- リリース作成: `mise run todo:release -- <version>`（**実行すると即公開される**）
-  - notarize を commit/push より前に通す。失敗しても remote には何も反映されず、
-    `git checkout apps/todo/macos/project.yml` で戻せる
+- リリース作成: `mise run todo:release [patch|minor|major|x.y.z]`（**実行すると即公開される**。Claude Code のセッションから叩いてよい）
+  - notarize を push より前に通す。push 前に失敗したら bump commit は trap で巻き戻り、remote も作業ツリーも元に戻る
+  - **リリースノートは `apps/todo/macos/CHANGELOG.md` の `[Unreleased]` から作る**（GitHub Release の本文と Sparkle の更新ダイアログの両方）。
+    叩く前にセッションが `git log <前回タグ>..HEAD -- apps/todo/macos packages/todo-shared` を読んで埋めて commit する。
+    空のまま叩くと事前チェックで止まる（`python3 scripts/changelog.py check` で単体確認できる）
+  - 事前チェックは他に: origin/main と一致・画面ロック・Developer ID 証明書・notary プロファイル・Sparkle 鍵（keychain account `todo-mac`）
+- Sparkle はローカルビルド（Debug）では動かない（コードの `#if !DEBUG` と、plist の feed が Release 構成限定の二重防御）:
+  ```bash
+  /usr/libexec/PlistBuddy -c 'Print :SUFeedURL' /tmp/todomac-dbg/Build/Products/Debug/TodoMac.app/Contents/Info.plist   # → 空文字
+  /usr/libexec/PlistBuddy -c 'Print :SUFeedURL' build/derived/Build/Products/Release/TodoMac.app/Contents/Info.plist      # → feed URL
+  ```
+  `mise run todo:build:sign-only` は Sparkle.framework 内部（Downloader.xpc / Installer.xpc / Updater.app / Autoupdate）の adhoc 残存と secure timestamp、
+  成果物 plist の `SUFeedURL` = 配信先、`SUPublicEDKey` の有無も見る
+- リリース後: `gh release view v<ver> --repo nyshk97/todo-app --json body` が CHANGELOG の該当セクション、
+  `curl -sL https://github.com/nyshk97/todo-app/releases/latest/download/appcast.xml` の `<description>` に同じ内容
 
 **`xcrun notarytool history --keychain-profile nyshk97-notary` が通らないときは画面ロックを疑う**
 （資格情報は data-protection keychain にあり、ロック中は「プロファイルが無い」ように見える）。
