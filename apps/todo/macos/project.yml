@@ -37,9 +37,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todomac
-        MARKETING_VERSION: "1.17.1"
+        MARKETING_VERSION: "1.18.0"
         # Sparkle は CFBundleVersion で新旧比較する。release.sh がタイムスタンプに書き換える
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "20260821232208"
         SWIFT_VERSION: "5.9"
         DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER
       configs:
