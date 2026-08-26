@@ -63,9 +63,11 @@ describe("API", () => {
     });
 
     const db = await getDb();
-    await db.exec("CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, carried_over INTEGER NOT NULL DEFAULT 0, completed_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
+    await db.exec("CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, carried_over INTEGER NOT NULL DEFAULT 0, completed_at TEXT, duration INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
     await db.exec("CREATE INDEX IF NOT EXISTS idx_todos_date ON todos(date);");
+    await db.exec("CREATE TABLE IF NOT EXISTS carry_overs (date TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')));");
     await db.exec("DELETE FROM todos");
+    await db.exec("DELETE FROM carry_overs");
   });
 
   afterEach(async () => {
@@ -405,28 +407,101 @@ describe("API", () => {
       expect(data.todos[1].carried_over).toBe(true);
     });
 
-    it("今日のタスクが既にあれば繰り越しは発動しない", async () => {
+    it("一度繰り越した日は、二度目の GET で繰り越しが発動しない", async () => {
       const db = await getDb();
-      const yesterdayStr = yesterday();
-      const todayStr = jstDaysFromToday(0);
-
       await db
         .prepare(
           "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
         )
-        .bind("y1", "昨日の", yesterdayStr, 0, 0)
+        .bind("y1", "昨日の", yesterday(), 0, 0)
         .run();
 
+      const first = await getTodos();
+      expect(first.todos).toHaveLength(1);
+      const second = await getTodos();
+      expect(second.todos).toHaveLength(1);
+      expect(second.todos[0].id).toBe(first.todos[0].id);
+    });
+
+    // 回帰テスト: 「その日の todos が 0 件か」で未繰り越しを判定していた頃は、
+    // 今日のタスクを全部削除すると次の GET で新しい id のまま復活していた
+    // （mac / iOS 共通で「ゴミ箱を押すと消えるがリロードで戻る」と見えていた）
+    it("繰り越したタスクを全部削除しても、次の GET で復活しない", async () => {
+      const db = await getDb();
+      await db.batch([
+        db
+          .prepare(
+            "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
+          )
+          .bind("y1", "昨日A", yesterday(), 0, 0),
+        db
+          .prepare(
+            "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
+          )
+          .bind("y2", "昨日B", yesterday(), 1, 0),
+      ]);
+
+      const carried = await getTodos();
+      expect(carried.todos).toHaveLength(2);
+
+      for (const todo of carried.todos) {
+        const res = await mf.dispatchFetch(
+          `http://localhost/todos/${todo.id}`,
+          { method: "DELETE", headers: AUTH }
+        );
+        expect(res.status).toBe(200);
+      }
+
+      const after = await getTodos();
+      expect(after.todos).toHaveLength(0);
+    });
+
+    it("繰り越したタスクを1件だけ削除しても、残りはそのまま", async () => {
+      const db = await getDb();
+      await db.batch([
+        db
+          .prepare(
+            "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
+          )
+          .bind("y1", "昨日A", yesterday(), 0, 0),
+        db
+          .prepare(
+            "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
+          )
+          .bind("y2", "昨日B", yesterday(), 1, 0),
+      ]);
+
+      const carried = await getTodos();
+      const res = await mf.dispatchFetch(
+        `http://localhost/todos/${carried.todos[0].id}`,
+        { method: "DELETE", headers: AUTH }
+      );
+      expect(res.status).toBe(200);
+
+      const after = await getTodos();
+      expect(after.todos).toHaveLength(1);
+      expect(after.todos[0].title).toBe("昨日B");
+    });
+
+    it("今日のタスクを全部削除した後に作り直しても、昨日の分は湧いてこない", async () => {
+      const db = await getDb();
       await db
         .prepare(
           "INSERT INTO todos (id, title, date, position, completed) VALUES (?, ?, ?, ?, ?)"
         )
-        .bind("t1", "今日の", todayStr, 0, 0)
+        .bind("y1", "昨日の", yesterday(), 0, 0)
         .run();
 
-      const data = await getTodos();
-      expect(data.todos).toHaveLength(1);
-      expect(data.todos[0].title).toBe("今日の");
+      const carried = await getTodos();
+      await mf.dispatchFetch(`http://localhost/todos/${carried.todos[0].id}`, {
+        method: "DELETE",
+        headers: AUTH,
+      });
+      await createTodo("今日の新しいタスク");
+
+      const after = await getTodos();
+      expect(after.todos).toHaveLength(1);
+      expect(after.todos[0].title).toBe("今日の新しいタスク");
     });
   });
 });

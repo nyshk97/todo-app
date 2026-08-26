@@ -9,21 +9,35 @@ type Bindings = {
 const todos = new Hono<{ Bindings: Bindings }>();
 
 // 自動繰り越し処理
-// 「件数チェック→INSERT」を別々に走らせると同時アクセスで二重繰り越しになるため、
-// ガード込みの1文で実行する（NOT EXISTS は文全体の評価前に確定する）
+// 「その日の todos が 0 件か」を未繰り越しの判定に使うと、その日のタスクを
+// 全部削除したときに再繰り越しが走り、削除したタスクが新しい id で復活する
+// （mac / iOS 共通で「消えるがリロードで戻る」と見える。2026-08-26 の調査）。
+// 繰り越し済みかどうかは carry_overs のマーカー行だけで判定する。
+// INSERT OR IGNORE が採番役を1リクエストに絞るので、同時アクセスでも二重繰り越しにならない。
 async function carryOverIfNeeded(db: D1Database, todayStr: string) {
+  const marker = await db
+    .prepare("INSERT OR IGNORE INTO carry_overs (date) VALUES (?)")
+    .bind(todayStr)
+    .run();
+  if (marker.meta.changes === 0) return; // 既に繰り越し済み
+
   const yesterdayStr = yesterday();
-  await db
-    .prepare(
-      `INSERT INTO todos (id, title, date, completed, position, carried_over)
+  try {
+    await db
+      .prepare(
+        `INSERT INTO todos (id, title, date, completed, position, carried_over)
        SELECT lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (random() & 3), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
               title, ?1, 0, position, 1
        FROM todos
-       WHERE date = ?2 AND completed = 0
-         AND NOT EXISTS (SELECT 1 FROM todos WHERE date = ?1)`
-    )
-    .bind(todayStr, yesterdayStr)
-    .run();
+       WHERE date = ?2 AND completed = 0`
+      )
+      .bind(todayStr, yesterdayStr)
+      .run();
+  } catch (e) {
+    // 繰り越しに失敗したらマーカーを戻す（次のリクエストでやり直せるように）
+    await db.prepare("DELETE FROM carry_overs WHERE date = ?").bind(todayStr).run();
+    throw e;
+  }
 }
 
 // GET /todos?date=YYYY-MM-DD
