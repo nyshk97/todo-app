@@ -84,6 +84,29 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $SECR
 - **注意**: Claude Code の Bash から `curl` だけ DNS を引けないことがある。その場合は
   `agent-browser` で開くか `! curl ...` でユーザーのターミナルに逃がす（グローバル CLAUDE.md 参照）
 
+### 「削除したタスクが復活する」の切り分け
+
+自動繰り越し（`carryOverIfNeeded`）が再発動していないかを見る。復活したタスクは**新しい id** を持つのが特徴。
+
+```bash
+cd apps/todo/api
+
+# 1. 今日の分が繰り越し済みとして記録されているか（1 行あれば再繰り越しは起きない）
+npx wrangler d1 execute todo-app-db --remote \
+  --command "SELECT * FROM carry_overs ORDER BY date DESC LIMIT 3"
+
+# 2. その日の繰り越し行が「いつ」作られたか
+npx wrangler d1 execute todo-app-db --remote \
+  --command "SELECT date, created_at, COUNT(*) AS n FROM todos WHERE carried_over = 1 GROUP BY date, created_at ORDER BY date DESC LIMIT 10"
+```
+
+- 2 の `created_at` は正常なら**前日 15:0x UTC**（= JST 0:00 ちょうど、その日最初の GET）に揃う。
+  日中の時刻が出ている／同じ date に created_at のグループが 2 つ以上ある → **再繰り越しが起きている**
+- 1 に今日の行が無いのに todos には今日の行がある → マーカーの取りこぼし。次の GET で繰り越しが走る
+
+回帰テストは `api.test.ts` の「繰り越したタスクを全部削除しても、次の GET で復活しない」。
+修正前のコードに戻すと `expected [ … ] to have a length of +0 but got 2` で落ちる。
+
 ## iOS アプリ
 
 - 実機にインストール: `mise run todo:build:ios` → Xcode で iPhone を選択して Cmd+R

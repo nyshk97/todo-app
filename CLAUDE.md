@@ -55,6 +55,7 @@ docs/
 - テストの DB スキーマ: `apps/todo/api/src/__tests__/api.test.ts` 内に直書き。マイグレーション追加時はここも更新すること
 - 日付は JST (UTC+9) で計算。`apps/todo/api/src/date.ts` の `toJST()` ヘルパーを使用
 - D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと
+- 自動繰り越し済みかどうかは `carry_overs` テーブルのマーカー行で判定する。「その日の todos が 0 件か」で代用すると、その日のタスクを全部削除したときに再繰り越しが走り、削除したタスクが新しい id で復活する（2026-08-26 の本番バグ）。切り分け手順は VERIFY.md「削除したタスクが復活する」
 
 ## iOS アプリ
 
