@@ -116,6 +116,32 @@ npx wrangler d1 execute todo-app-db --remote \
 
 - 開発用のビルド＆起動: `mise run todo:build:mac`（未署名。配布物ではない）
 
+### 昼/夜テーマの切り替わり直後の描画（22 時を待たずに確認する）
+
+Debug ビルド限定の環境変数で時刻とパネルの開閉を駆動する（`Theme.swift` / `TodoApp.swift` の `#if DEBUG`）。常用版（`/Applications`）は止めずに、別の derivedData から**バイナリを直接起動**して並走させる。
+
+```bash
+cd apps/todo/macos
+xcodebuild build -project TodoMac.xcodeproj -scheme TodoMac -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath /tmp/todomac-dbg CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO -quiet
+BIN=/tmp/todomac-dbg/Build/Products/Debug/TodoMac.app/Contents/MacOS/TodoMac
+
+# 20 秒で時刻上は夜になるが、画面への反映は ThemeClock の 30 秒タイマー待ち（= 起動約 30 秒。指定値から最大 30 秒遅れる）。
+# 下の sleep はこの前提で決めてあるので、NIGHT_AFTER を変えたら撮影時刻も「次の 30 秒刻み + 余裕」に直す。
+# TODOMAC_DEBUG_REOPEN=8,45 を足すと 8 秒で隠して 45 秒で開き直す（開く瞬間に反映されるのでタイマー待ちは無い）
+# （ステータスアイテムの AXPress は NSApp.currentEvent が nil で素通りするので開閉もフックで行う）
+TODOMAC_DEBUG_NIGHT_AFTER=20 "$BIN" & PID=$!
+sleep 10
+WID=$(osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); const ws = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(16, 0))); const w = ws.find(w => w.kCGWindowOwnerPID == '"$PID"' && w.kCGWindowBounds.Height > 300); w ? String(w.kCGWindowNumber) : ""')
+screencapture -x -o -l "$WID" /tmp/theme-day.png
+sleep 30   # 起動 40 秒 = ThemeClock の 30 秒 tick より後、todo 再取得の 60 秒タイマーより前。テーマ変化だけで全体が切り替わること
+screencapture -x -o -l "$WID" /tmp/theme-night.png
+kill $PID
+```
+
+- 判定は目視でなくピクセルで行う。**`ForEach` の行**（未完了のチェックボックス＝昼 `255,255,255` / 夜 `56,56,58`、完了のチェック fill＝昼 `237,199,76` / 夜 `217,184,72`）が、ヘッダー・背景と同じ側の色になっていること。完了行は昼と夜が似た色なので目視だと取り残しを見落とす
+- 2026-09-20 に報告された「行だけ昼色のまま残り、クリックで直る」は、この手順でも修正前コードで再現できなかった（可視のまま／隠して開く／Release 構成 のいずれも正常に切り替わった）。再発したら、再現条件の手がかり（直前にした操作・パネルを開いた時刻）を控える
+
 ### 署名まわりだけ確認する（notarize を飛ばす・1 分程度）
 
 ```bash

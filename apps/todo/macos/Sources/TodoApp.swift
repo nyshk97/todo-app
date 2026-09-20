@@ -65,7 +65,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         setupGlobalHotkey()
+
+        #if DEBUG
+        scheduleDebugReopen()
+        #endif
     }
+
+    #if DEBUG
+    // 検証用: TODOMAC_DEBUG_REOPEN=<隠す秒>,<開く秒> で、起動からの秒数でパネルを隠して開き直す
+    // （ステータスアイテムの AXPress は NSApp.currentEvent が nil で素通りするため。手順は VERIFY.md）
+    private func scheduleDebugReopen() {
+        guard let spec = ProcessInfo.processInfo.environment["TODOMAC_DEBUG_REOPEN"] else { return }
+        let times = spec.split(separator: ",").compactMap { TimeInterval($0) }
+        guard times.count == 2 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + times[0]) { [weak self] in
+            self?.panel.orderOut(nil)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + times[1]) { [weak self] in
+            self?.showPanel()
+        }
+    }
+    #endif
 
     // MARK: - 右Shift ダブルタップでパネル表示/非表示をトグル
 
@@ -172,6 +192,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showPanel() {
+        // 隠れている間に昼/夜を跨いでいても、古い色で一瞬表示されないよう表示前に合わせる
+        MainActor.assumeIsolated { ThemeClock.shared.refresh() }
         positionAtCursor()
         panel.orderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

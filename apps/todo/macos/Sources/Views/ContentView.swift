@@ -10,6 +10,9 @@ struct ContentView: View {
     @FocusState private var isInputFocused: Bool
 
     private var colors: AppColors { Theme.current }
+    // 行の id にテーマを含め、昼/夜の切り替わりで行を必ず作り直させる
+    // （body が夜色で再評価されても ForEach の行だけ昼色のまま残ることがあった）
+    private var themeKey: String { ThemeClock.shared.isNight ? "night" : "light" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,6 +124,7 @@ struct ContentView: View {
                 // 未完了タスク
                 ForEach(viewModel.uncompletedTodos) { todo in
                     todoRow(todo)
+                        .id("\(todo.id)-\(themeKey)")
                         .onDrag {
                             draggingTodoId = todo.id
                             return NSItemProvider(object: todo.id as NSString)
@@ -142,7 +146,7 @@ struct ContentView: View {
                 // 完了済みタスク
                 ForEach(viewModel.completedTodos) { todo in
                     todoRow(todo)
-                        .id("done-\(todo.id)")
+                        .id("done-\(todo.id)-\(themeKey)")
                 }
             }
         }
