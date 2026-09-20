@@ -89,6 +89,7 @@ docs/
 - `apps/todo/{ios,macos}/.env` と `apps/shelf/ios/.env` に `DEVELOPMENT_TEAM=<Team ID>` と `API_SECRET=<token>` を設定。`.env` も `Secrets.swift` も gitignore 対象なので、新しい環境では手で用意する（`.env` さえ置けば `Secrets.swift` は生成される）
 - `bash scripts/build.sh` - macOS アプリを Release ビルドして zip 化
 - `mise run release:todo [patch|minor|major|x.y.z]` - `apps/todo/macos/CHANGELOG.md` の `[Unreleased]` を確認 → `MARKETING_VERSION` bump + CHANGELOG 切り出しを commit → Release ビルド → notarize → Sparkle の EdDSA 署名 + appcast → GitHub Release（ノートは CHANGELOG）→ homebrew-tap の Cask 更新 → ローカル tap 同期まで自動実行。Claude Code のセッションから叩いてよい（画面ロック中だけ事前チェックで止まる。push 前に失敗したら bump commit は trap で巻き戻る）
+- バージョンの上げ方: バグ修正・リファクタだけのリリースは `patch`、機能追加があるときだけ `minor`（不要にバージョンを大きくしない）
 - リリース前に Claude Code のセッションが `git log <前回タグ>..HEAD -- apps/todo/macos packages/todo-shared` を読んで `[Unreleased]` を埋めて commit する（書き方は CHANGELOG 冒頭）。空のまま叩くと止まる
 - 既存インストール環境は Sparkle が自動更新する（起動時 + 24h ごと。メニューバー右クリック →「アップデートを確認…」で手動も可）。Sparkle 未搭載の 1.17.1 以前からは `brew upgrade todo-mac` で 1 回だけ手で入れる
 
@@ -106,6 +107,7 @@ docs/
 - todo（今日やるタスク管理）の補完アプリ
 - タスクに「完了」の概念はない。アクションは「移動」か「削除」
 - todo へのタスク移動機能あり（API 経由で POST → shelf から削除）
+- ナビゲーションの起点は右下の FAB メニューだけ（タブバーは廃止済み）。メイン画面「Shelf」が全画面で、Backlog / Archive は FAB から遷移する。Backlog / Archive の使用頻度が Shelf の数 % しかなかったための構成なので、画面や導線を足すときもタブバーを戻さず FAB に載せる
 
 ## デプロイ・ビルド
 
