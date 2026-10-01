@@ -281,6 +281,8 @@ struct ContentView: View {
                         .font(.system(size: 15))
                         .strikethrough(todo.completed)
                         .foregroundStyle(colors.textSecondary)
+                        // 完了タスクの URL はリンク色（青）にせず本文と同じグレーにする
+                        .tint(todo.completed ? colors.textSecondary : nil)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
