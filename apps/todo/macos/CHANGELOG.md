@@ -44,6 +44,8 @@ TodoMac（macOS 版 todo アプリ）の更新履歴。iOS 版と API は対象�
 
 ## [Unreleased]
 
+## [1.18.2] - 2026-10-01
+
 ### 📝 Changed
 - 完了したタスクの URL を青でなく本文と同じグレーで表示するように変更
 
