@@ -259,6 +259,8 @@ struct ContentView: View {
                             editingTodoId = nil
                         }
                     Button {
+                        let title = editingTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        UIPasteboard.general.string = title.isEmpty ? todo.title : title
                         Task { await viewModel.deleteTodo(todo) }
                         editingTodoId = nil
                     } label: {
