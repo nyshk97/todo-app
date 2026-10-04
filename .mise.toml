@@ -46,6 +46,11 @@ bash scripts/generate-projects.sh
 open apps/todo/ios/TodoApp.xcodeproj
 """
 
+[tasks."todo:device"]
+description = "todo: iOS アプリを実機に Release で入れて起動 (ペアリング済みなら USB 不要・端末のロック解除が必要)"
+usage = 'arg "[device]" help="入れる端末（名前・iPhone / iPad・UDID の一部。all で全部）。実機が 1 台なら省略可" default=""'
+run = 'bash scripts/install-ios-device.sh todo "$usage_device"'
+
 [tasks."todo:build:mac"]
 description = "todo: macOS アプリをビルドして起動"
 run = """
@@ -89,3 +94,8 @@ run = """
 bash scripts/generate-projects.sh
 open apps/shelf/ios/Shelf.xcodeproj
 """
+
+[tasks."shelf:device"]
+description = "shelf: iOS アプリを実機に Release で入れて起動 (ペアリング済みなら USB 不要・端末のロック解除が必要)"
+usage = 'arg "[device]" help="入れる端末（名前・iPhone / iPad・UDID の一部。all で全部）。実機が 1 台なら省略可" default=""'
+run = 'bash scripts/install-ios-device.sh shelf "$usage_device"'

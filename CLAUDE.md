@@ -68,7 +68,7 @@ docs/
 - `contextMenu` は dimming バグがあるので使わない。タスク名タップで編集、ゴミ箱アイコンで即削除
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
 - iOS の `PendingOperation` 同期では、同期開始時に fetch した配列 snapshot を最後まで回さない。同期中に ViewModel 側で op が削除・相殺される race があるため、各 iteration で次の pending op を SwiftData から取り直す。HTTP 400/403/409 など再試行で解消しない op は先頭で詰まらせず、ユーザーに見える同期エラーを残して drop する
-- 実機インストール: 基本は Xcode で実機を選んで Cmd+R でよい。有料 Apple Developer Program の Development profile は1年有効（2026-08 に embedded.mobileprovision の ExpirationDate で実測確認済み）。「約1週間で期限切れ」は無料 Apple ID（Personal Team）時代の制限で、現在は該当しない。長期運用向けに Ad Hoc export する場合: `mise run todo:build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Devices and Simulators に .ipa をドラッグ
+- 実機インストール: 基本は `mise run todo:device`（`scripts/install-ios-device.sh`。Release でビルド → devicectl で転送 → 起動）。一度 USB でペアリングした端末なら同じ Wi-Fi で USB 不要、ただし端末のロック解除が要る（ロック中は「The developer disk image could not be mounted」で落ちる）。届かない端末（`tunnelState` が `unavailable`）は自動で外し、複数届くときは `mise run todo:device iPhone` のように指定する。Xcode で実機を選んで Cmd+R でもよい。有料 Apple Developer Program の Development profile は1年有効（2026-08 に embedded.mobileprovision の ExpirationDate で実測確認済み）。「約1週間で期限切れ」は無料 Apple ID（Personal Team）時代の制限で、現在は該当しない。長期運用向けに Ad Hoc export する場合: `mise run todo:build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Devices and Simulators に .ipa をドラッグ
 - `GENERATE_INFOPLIST_FILE: true` と `info:` (path なし) は XcodeGen で併用不可。カスタム値は `Secrets.swift` の自動生成で対応
 - XcodeGen で新規ファイルを追加すると SourceKit が一時的に偽陽性エラー（`Cannot find type X in scope` 等）を出すが、これは `.xcodeproj` 未再生成によるもの。`bash scripts/generate-projects.sh` 後に解消する。多数表示されてもひるまず、最後に `xcodebuild ... -sdk iphonesimulator build` で実ビルドして確認する
 
@@ -114,7 +114,7 @@ docs/
 - API: `mise run shelf:deploy`（Cloudflare Workers）
 - Web: `mise run shelf:deploy:web`（Cloudflare Pages、Git連携なし・手動デプロイ）
 - DB マイグレーション: `mise run shelf:deploy:migrate`（`apps/shelf/api/migrations/` に SQL 追加後に実行）
-- iOS: `mise run shelf:build:ios`（xcodegen でプロジェクト生成 → Xcode で開く → Cmd+R で実機ビルド）
+- iOS: `mise run shelf:device`（実機に Release で入れて起動。USB 不要・端末のロック解除が要る。詳細は todo の「実機インストール」）。Xcode で開くなら `mise run shelf:build:ios`（xcodegen でプロジェクト生成 → Xcode で開く → Cmd+R で実機ビルド）
 - `mise run shelf:test`（`apps/shelf/api` の vitest）は Tasks 系 9 件が main でも失敗する既知の状態（2026-07 時点）。テスト失敗を見たらまず main で再現するか切り分ける
 
 ## API
