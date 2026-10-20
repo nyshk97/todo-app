@@ -159,9 +159,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func statusItemClicked(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { return }
-
-        if event.type == .rightMouseUp {
+        // 右クリックのときだけメニュー、それ以外は左クリックとして扱う。
+        // アクセシビリティからの「押す」（AXPress。MenuBar Tidy の一覧から開いたとき等）は
+        // マウスイベントを伴わず、currentEvent が nil になるので、nil で弾くと何も起きない。
+        if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
             let versionItem = NSMenuItem(title: "v\(version)", action: nil, keyEquivalent: "")
