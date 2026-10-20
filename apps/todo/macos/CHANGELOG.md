@@ -44,6 +44,9 @@ TodoMac（macOS 版 todo アプリ）の更新履歴。iOS 版と API は対象�
 
 ## [Unreleased]
 
+### 🐛 Fixed
+- MenuBar Tidyの一覧など、アクセシビリティから押されたときにパネルが開かないのを修正
+
 ## [1.19.0] - 2026-10-04
 
 ### ✨ Added
