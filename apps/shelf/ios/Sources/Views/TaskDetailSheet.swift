@@ -19,6 +19,12 @@ struct TaskDetailSheet: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var pendingFiles: [(data: Data, filename: String, mimeType: String)] = []
     @State private var showFilePicker = false
+    @State private var repeatIntervalText = ""
+    @FocusState private var isIntervalFocused: Bool
+
+    private var isRecurring: Bool {
+        task.projectId == viewModel.recurringProject?.id
+    }
 
     var body: some View {
         NavigationStack {
@@ -26,6 +32,9 @@ struct TaskDetailSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     titleSection
                     dueDateSection
+                    if isRecurring {
+                        repeatSection
+                    }
                     moveSection
                     commentsSection
                 }
@@ -211,6 +220,97 @@ struct TaskDetailSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    // MARK: - Repeat
+
+    private var repeatSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("繰り返し")
+                .font(.subheadline)
+                .foregroundStyle(Theme.textTertiary)
+
+            HStack(spacing: 8) {
+                if task.repeatUnit != nil {
+                    TextField("1", text: $repeatIntervalText)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.plain)
+                        .foregroundStyle(Theme.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 56)
+                        .padding(.vertical, 6)
+                        .background(Theme.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .focused($isIntervalFocused)
+                        .onChange(of: isIntervalFocused) {
+                            if !isIntervalFocused { saveRepeat(unit: task.repeatUnit) }
+                        }
+                }
+
+                Picker("", selection: Binding(
+                    get: { task.repeatUnit ?? "" },
+                    set: { saveRepeat(unit: $0.isEmpty ? nil : $0) }
+                )) {
+                    Text("なし").tag("")
+                    ForEach(Recurrence.units, id: \.value) { unit in
+                        Text(unit.label).tag(unit.value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.textSecondary)
+                .disabled(!network.isOnline)
+
+                Spacer()
+            }
+
+            Text(repeatHint)
+                .font(.caption)
+                .foregroundStyle(Theme.textQuaternary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.bgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onAppear { repeatIntervalText = String(task.repeatInterval ?? 1) }
+        .toolbar {
+            if isIntervalFocused {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { isIntervalFocused = false }
+                }
+            }
+        }
+    }
+
+    private var repeatHint: String {
+        guard task.repeatUnit != nil else {
+            return "繰り返しを付けると、期日の朝5時にShelfの先頭へ複製されます"
+        }
+        guard let dueDate = task.dueDate else {
+            return "期日を入れると、その日の朝5時にShelfの先頭へ複製されます"
+        }
+        let parts = dueDate.split(separator: "-").compactMap { Int($0) }
+        let label = parts.count == 3 ? "\(parts[0])/\(parts[1])/\(parts[2])" : dueDate
+        return "\(label)の朝5時にShelfの先頭へ複製し、期日を次の回へ進めます"
+    }
+
+    private func saveRepeat(unit: String?) {
+        let interval: Int?
+        if unit == nil {
+            interval = nil
+        } else if let n = Int(repeatIntervalText), (1...Recurrence.maxInterval).contains(n) {
+            interval = n
+        } else {
+            repeatIntervalText = String(task.repeatInterval ?? 1)
+            return
+        }
+        guard unit != task.repeatUnit || interval != task.repeatInterval else { return }
+        Swift.Task {
+            if let updated = await viewModel.updateTaskRepeat(task, unit: unit, interval: interval) {
+                task = updated
+                repeatIntervalText = String(updated.repeatInterval ?? 1)
+            }
+        }
+    }
+
     // MARK: - Move
 
     private var moveSection: some View {
@@ -226,14 +326,17 @@ struct TaskDetailSheet: View {
 
             Spacer()
 
-            Button {
-                showMoveToTodayConfirm = true
-            } label: {
-                Label("今日のTODOへ", systemImage: "arrow.up.forward")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.green)
+            // Recurring の元のタスクは毎朝の複製の元なので、今日のTODOへは複製のほうから送る
+            if !isRecurring {
+                Button {
+                    showMoveToTodayConfirm = true
+                } label: {
+                    Label("今日のTODOへ", systemImage: "arrow.up.forward")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.green)
+                }
+                .disabled(!network.isOnline)
             }
-            .disabled(!network.isOnline)
         }
         .padding(12)
         .background(Theme.bgSurface)

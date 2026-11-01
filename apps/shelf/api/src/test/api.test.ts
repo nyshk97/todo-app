@@ -6,47 +6,11 @@ import {
 } from "vitest";
 import { env } from "cloudflare:test";
 import app from "../index";
-import { req, json } from "./helpers";
+import { req, json, applySchema } from "./helpers";
 
 // Apply migration before tests
 beforeAll(async () => {
-  const migration = `
-    CREATE TABLE IF NOT EXISTS projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS sections (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      section_id TEXT REFERENCES sections(id) ON DELETE SET NULL,
-      title TEXT NOT NULL,
-      due_date TEXT,
-      position INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY,
-      task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-      content TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `;
-  for (const stmt of migration.split(";").filter((s) => s.trim())) {
-    await env.DB.prepare(stmt).run();
-  }
+  await applySchema();
 });
 
 describe("Auth", () => {
@@ -305,10 +269,9 @@ describe("Comments", () => {
   });
 
   it("creates a comment", async () => {
-    const res = await req(`/tasks/${taskId}/comments`, {
-      method: "POST",
-      body: { content: "テストコメント https://example.com" },
-    });
+    const form = new FormData();
+    form.append("content", "テストコメント https://example.com");
+    const res = await req(`/tasks/${taskId}/comments`, { method: "POST", form });
     expect(res.status).toBe(201);
     const data = await json<{ id: string; content: string }>(res);
     expect(data.content).toBe("テストコメント https://example.com");

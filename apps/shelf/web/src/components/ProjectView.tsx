@@ -241,6 +241,9 @@ export function ProjectView({ projectId, onClickTask }: ProjectViewProps) {
       position: sectionTasks.length,
       comment_count: 0,
       archived_at: null,
+      repeat_unit: null,
+      repeat_interval: null,
+      repeat_anchor_day: null,
       created_at: now,
       updated_at: now,
     };

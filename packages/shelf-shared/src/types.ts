@@ -39,6 +39,9 @@ export interface UpdateSectionRequest {
 
 // --- Tasks ---
 
+/** 繰り返しの単位（Recurring プロジェクトのタスクだけが持つ） */
+export type RepeatUnit = "day" | "week" | "month" | "year";
+
 export interface Task {
   id: string;
   project_id: string;
@@ -48,6 +51,9 @@ export interface Task {
   position: number;
   comment_count: number;
   archived_at: string | null;
+  repeat_unit: RepeatUnit | null;
+  repeat_interval: number | null;
+  repeat_anchor_day: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +71,9 @@ export interface UpdateTaskRequest {
   section_id?: string | null;
   due_date?: string | null;
   position?: number;
+  /** repeat_unit と repeat_interval は両方そろえて送る（null で繰り返しを外す） */
+  repeat_unit?: RepeatUnit | null;
+  repeat_interval?: number | null;
 }
 
 export interface ReorderRequest {

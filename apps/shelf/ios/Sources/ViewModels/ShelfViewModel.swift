@@ -390,6 +390,25 @@ final class ShelfViewModel {
         }
     }
 
+    var recurringProject: Project? {
+        projects.first { $0.name == Recurrence.projectName }
+    }
+
+    func updateTaskRepeat(_ task: Task, unit: String?, interval: Int?) async -> Task? {
+        guard requireOnline("繰り返しの変更はオンライン時のみ使えます") else { return nil }
+        do {
+            let updated = try await api.updateTaskRepeat(id: task.id, unit: unit, interval: interval)
+            replaceTask(old: task, new: updated)
+            await persistCache()
+            return updated
+        } catch {
+            showToast("繰り返しの更新に失敗しました") { [weak self] in
+                _ = await self?.updateTaskRepeat(task, unit: unit, interval: interval)
+            }
+            return nil
+        }
+    }
+
     func deleteTask(_ task: Task) async {
         let snapshot = tasks[task.projectId] ?? []
         tasks[task.projectId]?.removeAll { $0.id == task.id }

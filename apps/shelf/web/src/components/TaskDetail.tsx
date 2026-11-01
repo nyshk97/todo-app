@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import type { Task, Comment, Project, Section, Attachment } from "@todo-shelf/shared";
+import type { Task, Comment, Project, Section, Attachment, RepeatUnit } from "@todo-shelf/shared";
 import { api } from "../lib/api";
-import { getDueDateStatus } from "../lib/date";
+import { formatDate, getDueDateStatus } from "../lib/date";
+import { REPEAT_UNITS } from "../lib/recurrence";
 import { AutoLink } from "./AutoLink";
 import { useToast } from "./Toast";
 
@@ -14,6 +15,8 @@ interface TaskDetailProps {
   onMoveToToday: (id: string) => void;
   onClose: () => void;
   readOnly?: boolean;
+  /** Recurring のタスク。繰り返しの欄を出し、「今日のTODOへ移動」は出さない */
+  recurring?: boolean;
 }
 
 const dueDateColors: Record<string, string> = {
@@ -41,9 +44,12 @@ export function TaskDetail({
   onMoveToToday,
   onClose,
   readOnly = false,
+  recurring = false,
 }: TaskDetailProps) {
   const [title, setTitle] = useState(task.title);
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
+  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit | "">(task.repeat_unit ?? "");
+  const [repeatInterval, setRepeatInterval] = useState(String(task.repeat_interval ?? 1));
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -103,6 +109,29 @@ export function TaskDetail({
       setDueDate(prevDueDate);
       onUpdate({ ...task, due_date: prevDueDate || null });
       showToast("期日の更新に失敗しました", () => handleDueDateChange(value));
+    }
+  };
+
+  const handleRepeatChange = async (unit: RepeatUnit | "", intervalText: string) => {
+    const interval = Number(intervalText);
+    if (unit && !(Number.isInteger(interval) && interval >= 1 && interval <= 999)) {
+      setRepeatInterval(String(task.repeat_interval ?? 1));
+      return;
+    }
+    const prev = { repeat_unit: task.repeat_unit, repeat_interval: task.repeat_interval };
+    const next = unit
+      ? { repeat_unit: unit, repeat_interval: interval }
+      : { repeat_unit: null, repeat_interval: null };
+    setRepeatUnit(unit);
+    onUpdate({ ...task, ...next });
+    try {
+      const updated = await api.patch<Task>(`/tasks/${task.id}`, next);
+      onUpdate(updated);
+    } catch {
+      setRepeatUnit(prev.repeat_unit ?? "");
+      setRepeatInterval(String(prev.repeat_interval ?? 1));
+      onUpdate({ ...task, ...prev });
+      showToast("繰り返しの更新に失敗しました", () => handleRepeatChange(unit, intervalText));
     }
   };
 
@@ -290,6 +319,65 @@ export function TaskDetail({
           )}
         </div>
 
+        {/* Repeat */}
+        {recurring && !readOnly && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 510, color: "var(--text-tertiary)" }}>
+                繰り返し
+              </label>
+              {repeatUnit && (
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={repeatInterval}
+                  onChange={(e) => setRepeatInterval(e.target.value)}
+                  onBlur={() => {
+                    if (String(task.repeat_interval) !== repeatInterval) handleRepeatChange(repeatUnit, repeatInterval);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  style={{
+                    width: 64,
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid var(--border-standard)",
+                    borderRadius: "var(--radius-md)",
+                    color: "var(--text-secondary)",
+                    padding: "4px 8px",
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+              )}
+              <select
+                value={repeatUnit}
+                onChange={(e) => handleRepeatChange(e.target.value as RepeatUnit | "", repeatInterval)}
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid var(--border-standard)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-secondary)",
+                  padding: "4px 8px",
+                  fontSize: 13,
+                  outline: "none",
+                }}
+              >
+                <option value="">なし</option>
+                {REPEAT_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-quaternary)", marginTop: 6, lineHeight: 1.6 }}>
+              {!repeatUnit
+                ? "繰り返しを付けると、期日の朝5時にShelfの先頭へ複製されます"
+                : dueDate
+                  ? `${formatDate(dueDate)}の朝5時にShelfの先頭へ複製し、期日を次の回へ進めます`
+                  : "期日を入れると、その日の朝5時にShelfの先頭へ複製されます"}
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         {!readOnly && (
           <div style={{
@@ -313,7 +401,7 @@ export function TaskDetail({
             >
               移動
             </button>
-            <button
+            {!recurring && <button
               onClick={() => onMoveToToday(task.id)}
               style={{
                 padding: "4px 10px",
@@ -326,7 +414,7 @@ export function TaskDetail({
               }}
             >
               今日のTODOへ移動
-            </button>
+            </button>}
             <button
               onClick={() => { onDelete(task.id); onClose(); }}
               style={{

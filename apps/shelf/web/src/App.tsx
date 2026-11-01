@@ -15,6 +15,8 @@ import { Fab } from "./components/Fab";
 import { ProjectView } from "./components/ProjectView";
 import { TaskDetail } from "./components/TaskDetail";
 import { ArchiveView } from "./components/ArchiveView";
+import { RecurringView } from "./components/RecurringView";
+import { RECURRING_PROJECT_NAME } from "./lib/recurrence";
 import { ToastProvider, useToast } from "./components/Toast";
 
 /** Find the "main" project (Shelf or Deck, or first project) */
@@ -68,6 +70,7 @@ function Shell() {
   });
 
   const backlogProject = projects.find((p) => p.name === "Backlog");
+  const recurringProject = projects.find((p) => p.name === RECURRING_PROJECT_NAME);
   const backlogUpcomingCount = backlogProject
     ? upcoming.filter((t) => t.project_id === backlogProject.id).length
     : 0;
@@ -229,6 +232,12 @@ function Shell() {
             projects={projects}
             sections={allSections}
           />
+        ) : projectId && projectId === recurringProject?.id ? (
+          <RecurringView
+            key={projectId}
+            projectId={projectId}
+            onClickTask={setSelectedTask}
+          />
         ) : projectId ? (
           <ProjectView
             key={projectId}
@@ -264,6 +273,7 @@ function Shell() {
           onDelete={handleTaskDelete}
           onMoveToToday={handleMoveToToday}
           onClose={() => setSelectedTask(null)}
+          recurring={selectedTask.project_id === recurringProject?.id}
         />
       )}
     </div>

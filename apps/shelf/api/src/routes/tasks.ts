@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import type { Bindings } from "../lib/db";
 import { generateId, nowJST, todayJST, buildUpdate } from "../lib/db";
+import {
+  RECURRING_PROJECT_NAME,
+  dayOfMonth,
+  isRepeatInterval,
+  isRepeatUnit,
+} from "../lib/recurrence";
 import type {
   CreateTaskRequest,
   UpdateTaskRequest,
@@ -21,9 +27,10 @@ app.get("/tasks/upcoming", async (c) => {
     `SELECT t.*, p.name as project_name
      FROM tasks t JOIN projects p ON t.project_id = p.id
      WHERE t.due_date IS NOT NULL AND t.due_date <= ? AND t.archived_at IS NULL
+       AND p.name != ?
      ORDER BY t.due_date, t.position`
   )
-    .bind(endDate)
+    .bind(endDate, RECURRING_PROJECT_NAME)
     .all();
   return c.json(results.results);
 });
@@ -174,13 +181,68 @@ app.patch("/tasks/:id", async (c) => {
   const body = await c.req.json<UpdateTaskRequest>();
 
   const existing = await c.env.DB.prepare(
-    "SELECT id FROM tasks WHERE id = ?"
+    `SELECT t.due_date, t.repeat_unit, t.repeat_anchor_day, p.name as project_name
+     FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ?`
   )
     .bind(id)
-    .first();
+    .first<{
+      due_date: string | null;
+      repeat_unit: string | null;
+      repeat_anchor_day: number | null;
+      project_name: string;
+    }>();
   if (!existing) return c.json({ error: "Not found" }, 404);
 
-  const { sql, bindings } = buildUpdate("tasks", id, { ...body }, nowJST());
+  const { repeat_unit, repeat_interval, ...rest } = body;
+  const fields: Record<string, unknown> = { ...rest };
+
+  if (repeat_unit !== undefined || repeat_interval !== undefined) {
+    if (repeat_unit === null && repeat_interval === null) {
+      fields.repeat_unit = null;
+      fields.repeat_interval = null;
+      fields.repeat_anchor_day = null;
+    } else if (isRepeatUnit(repeat_unit) && isRepeatInterval(repeat_interval)) {
+      fields.repeat_unit = repeat_unit;
+      fields.repeat_interval = repeat_interval;
+    } else {
+      return c.json({ error: "repeat_unit and repeat_interval must be set together" }, 400);
+    }
+  }
+
+  // 繰り返しは Recurring のタスクだけが持つ。Recurring から出すときは繰り返しを外す
+  let targetProjectName = existing.project_name;
+  if (rest.project_id) {
+    const target = await c.env.DB.prepare("SELECT name FROM projects WHERE id = ?")
+      .bind(rest.project_id)
+      .first<{ name: string }>();
+    if (!target) return c.json({ error: "Project not found" }, 400);
+    targetProjectName = target.name;
+  }
+  const isRecurring = targetProjectName === RECURRING_PROJECT_NAME;
+  if (!isRecurring) {
+    if (fields.repeat_unit) {
+      return c.json({ error: `only ${RECURRING_PROJECT_NAME} tasks can repeat` }, 400);
+    }
+    if (existing.project_name === RECURRING_PROJECT_NAME) {
+      fields.repeat_unit = null;
+      fields.repeat_interval = null;
+      fields.repeat_anchor_day = null;
+    }
+  } else if (fields.repeat_unit !== null) {
+    // 月・年ごとの「何日」は、期日を入れ直したとき・繰り返しを初めて付けたとき・単位を変えたときに今の期日から覚える
+    const dueDate = rest.due_date !== undefined ? rest.due_date : existing.due_date;
+    if (rest.due_date) {
+      fields.repeat_anchor_day = dayOfMonth(rest.due_date);
+    } else if (
+      fields.repeat_unit &&
+      (existing.repeat_anchor_day === null || fields.repeat_unit !== existing.repeat_unit) &&
+      dueDate
+    ) {
+      fields.repeat_anchor_day = dayOfMonth(dueDate);
+    }
+  }
+
+  const { sql, bindings } = buildUpdate("tasks", id, fields, nowJST());
   await c.env.DB.prepare(sql).bind(...bindings).run();
 
   const task = await c.env.DB.prepare("SELECT * FROM tasks WHERE id = ?")
@@ -219,10 +281,16 @@ app.delete("/tasks/:id", async (c) => {
 // POST /tasks/:id/move-to-today
 app.post("/tasks/:id/move-to-today", async (c) => {
   const id = c.req.param("id");
-  const task = await c.env.DB.prepare("SELECT * FROM tasks WHERE id = ?")
+  const task = await c.env.DB.prepare(
+    "SELECT p.name as project_name FROM tasks t JOIN projects p ON t.project_id = p.id WHERE t.id = ?"
+  )
     .bind(id)
-    .first();
+    .first<{ project_name: string }>();
   if (!task) return c.json({ error: "Not found" }, 404);
+  // Recurring の元のタスクは毎朝の複製の元なのでアーカイブしない（複製のほうを移動する）
+  if (task.project_name === RECURRING_PROJECT_NAME) {
+    return c.json({ error: `${RECURRING_PROJECT_NAME} tasks cannot be moved to today` }, 400);
+  }
 
   // Shelf側でアーカイブのみ（todo-appへのPOSTはクライアント側で実行）
   const now = nowJST();

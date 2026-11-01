@@ -2,6 +2,7 @@ import SwiftUI
 
 enum AppDestination: Hashable {
     case backlog(String)   // project id
+    case recurring(String) // project id
     case archive
 }
 
@@ -23,6 +24,12 @@ struct ContentView: View {
                 case .backlog(let projectId):
                     ProjectView(viewModel: viewModel, projectId: projectId)
                         .navigationTitle("Backlog")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(Theme.bgPanel, for: .navigationBar)
+                        .toolbarBackground(.visible, for: .navigationBar)
+                case .recurring(let projectId):
+                    RecurringView(viewModel: viewModel, projectId: projectId)
+                        .navigationTitle(Recurrence.projectName)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbarBackground(Theme.bgPanel, for: .navigationBar)
                         .toolbarBackground(.visible, for: .navigationBar)
@@ -68,6 +75,11 @@ struct ContentView: View {
                         onNavigateBacklog: {
                             if let backlog = backlogProject {
                                 path.append(AppDestination.backlog(backlog.id))
+                            }
+                        },
+                        onNavigateRecurring: {
+                            if let recurring = viewModel.recurringProject {
+                                path.append(AppDestination.recurring(recurring.id))
                             }
                         },
                         onNavigateArchive: {
@@ -140,6 +152,7 @@ struct FabButton: View {
     let viewModel: ShelfViewModel
     let backlogUpcomingCount: Int
     let onNavigateBacklog: () -> Void
+    let onNavigateRecurring: () -> Void
     let onNavigateArchive: () -> Void
 
     @State private var showMenu = false
@@ -151,6 +164,14 @@ struct FabButton: View {
                     onNavigateBacklog()
                 } label: {
                     Label("Backlog", systemImage: "tray.full")
+                }
+            }
+
+            if viewModel.recurringProject != nil {
+                Button {
+                    onNavigateRecurring()
+                } label: {
+                    Label(Recurrence.projectName, systemImage: "repeat")
                 }
             }
 

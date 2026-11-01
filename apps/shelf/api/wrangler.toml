@@ -5,6 +5,10 @@ compatibility_date = "2025-01-01"
 [observability]
 enabled = true
 
+# 毎朝 JST 5:00 に Recurring のタスクを Shelf へ複製する（src/lib/recurrence.ts）
+[triggers]
+crons = ["0 20 * * *"]
+
 [[r2_buckets]]
 binding = "ATTACHMENTS"
 bucket_name = "todo-shelf-attachments"
@@ -22,6 +26,10 @@ TODO_APP_API_URL = "https://todo-app-api.d0ne1s-todo.workers.dev"
 binding = "DB"
 database_name = "todo-shelf-db-test"
 database_id = "96200c31-66e0-48fe-94a5-b2f9a40523b9"
+
+[[env.test.r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "todo-shelf-attachments-test"
 
 [env.test.vars]
 API_SECRET = "test-secret"

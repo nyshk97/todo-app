@@ -107,7 +107,15 @@ docs/
 - todo（今日やるタスク管理）の補完アプリ
 - タスクに「完了」の概念はない。アクションは「移動」か「削除」
 - todo へのタスク移動機能あり（API 経由で POST → shelf から削除）
-- ナビゲーションの起点は右下の FAB メニューだけ（タブバーは廃止済み）。メイン画面「Shelf」が全画面で、Backlog / Archive は FAB から遷移する。Backlog / Archive の使用頻度が Shelf の数 % しかなかったための構成なので、画面や導線を足すときもタブバーを戻さず FAB に載せる
+- ナビゲーションの起点は右下の FAB メニューだけ（タブバーは廃止済み）。メイン画面「Shelf」が全画面で、Backlog / Recurring / Archive は FAB から遷移する。Backlog / Archive の使用頻度が Shelf の数 % しかなかったための構成なので、画面や導線を足すときもタブバーを戻さず FAB に載せる
+
+## Recurring（繰り返しタスク）
+
+- iOS のリマインダーの置き換え（2026-11 から）。**繰り返しは Recurring プロジェクトのタスクだけが持つ**（`tasks.repeat_unit` / `repeat_interval` / `repeat_anchor_day`）。ほかのプロジェクトのタスクに付けようとすると API が 400、Recurring から移動すると API が繰り返しを外す
+- **毎朝 JST 5:00 の cron**（`wrangler.toml` の `[triggers]`、処理は `apps/shelf/api/src/lib/recurrence.ts` の `materializeRecurring`）が、期日が今日以前のものを **Shelf のセクションなしの先頭に、今日の期日で複製**し（コメント・添付も写す。添付は R2 の実体もコピー）、元の期日を次の回へ進める。todo には送らない（todo へは複製から手で「今日へ移動」する）
+- 次の回は**期日から**数える。月・年ごとは元の「何日」を `repeat_anchor_day` に覚えておき、1/31 の毎月は 2/28 → 3/31 と戻る。何回分か取りこぼしていても複製は1件で、次回は今日より後まで進める。前の回の複製が残っていても回ごとに別の行を入れる
+- 複製・コメント・添付の id は (元のタスク, 回の日付) から決まるので、cron が2回走っても増えない
+- Recurring の元のタスクは「今日へ移動」できない（API が 400、両クライアントともボタンを出さない）。`/tasks/upcoming` からも外してある（Backlog のバッジに混ざらない）
 
 ## デプロイ・ビルド
 
@@ -115,7 +123,7 @@ docs/
 - Web: `mise run shelf:deploy:web`（Cloudflare Pages、Git連携なし・手動デプロイ）
 - DB マイグレーション: `mise run shelf:deploy:migrate`（`apps/shelf/api/migrations/` に SQL 追加後に実行）
 - iOS: `mise run shelf:device`（実機に Release で入れて起動。USB 不要・端末のロック解除が要る。詳細は todo の「実機インストール」）。Xcode で開くなら `mise run shelf:build:ios`（xcodegen でプロジェクト生成 → Xcode で開く → Cmd+R で実機ビルド）
-- `mise run shelf:test`（`apps/shelf/api` の vitest）は Tasks 系 9 件が main でも失敗する既知の状態（2026-07 時点）。テスト失敗を見たらまず main で再現するか切り分ける
+- `mise run shelf:test`（`apps/shelf/api` の vitest）は 2026-11-01 から全件通る（Tasks 系 9 件の失敗はテスト用スキーマに `archived_at` が無かったのが原因で、`src/test/helpers.ts` の `SCHEMA` に寄せて解消）。マイグレーションで列を足したら `SCHEMA` も直す
 
 ## API
 
@@ -162,7 +170,7 @@ docs/
 
 ## プロジェクト名のハードコード
 
-- コード内で `p.name === "Shelf"`, `"Backlog"`, `"Archive"` などプロジェクト名の完全一致で表示制御している箇所がある（Web: App.tsx, Fab.tsx / iOS: ContentView.swift）
+- コード内で `p.name === "Shelf"`, `"Backlog"`, `"Archive"`, `"Recurring"` などプロジェクト名の完全一致で表示制御している箇所がある（Web: App.tsx, Fab.tsx, lib/recurrence.ts / iOS: ContentView.swift, RecurringView.swift の `Recurrence.projectName`）。**`"Shelf"` と `"Recurring"` は API の cron（`apps/shelf/api/src/lib/recurrence.ts`）とテストも名前で引く**
 - プロジェクト名を変更する場合、コード変更 → デプロイ → DB リネームの順で行うか、同時に反映すること
 
 ## Web のキャッシュ層（TanStack Query）

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Project } from "@todo-shelf/shared";
 import { api } from "../lib/api";
+import { RECURRING_PROJECT_NAME } from "../lib/recurrence";
 
 interface FabProps {
   projects: Project[];
@@ -17,6 +18,7 @@ export function Fab({ projects, backlogUpcomingCount, onNavigate, onProjectsChan
   const [editingName, setEditingName] = useState("");
 
   const backlogProject = projects.find((p) => p.name === "Backlog");
+  const recurringProject = projects.find((p) => p.name === RECURRING_PROJECT_NAME);
   const archivePath = "/archive";
 
   const handleAdd = async () => {
@@ -161,6 +163,36 @@ export function Fab({ projects, backlogUpcomingCount, onNavigate, onProjectsChan
                   {backlogUpcomingCount}
                 </span>
               )}
+            </button>
+          )}
+
+          {/* Recurring */}
+          {recurringProject && (
+            <button
+              onClick={() => {
+                onNavigate(`/projects/${recurringProject.id}`);
+                setShowMenu(false);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "var(--radius-md)",
+                border: "none",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                fontSize: 13,
+                fontWeight: 510,
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              Recurring
             </button>
           )}
 

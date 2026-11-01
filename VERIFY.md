@@ -232,8 +232,25 @@ ps -o pid,comm -p "$(pgrep -x TodoMac | head -1)"   # /Applications/... から�
 
 ## API
 
-- テスト実行: `cd apps/shelf/api && npm test`
-- Tasks 系 9 件（＋ `Comments` suite）は main でも失敗する既知の状態。**失敗数ではなく失敗テスト名の集合**を main と比較して回帰を判定する
+- テスト実行: `cd apps/shelf/api && npm test`（2026-11-01 から全件通る。テスト用スキーマは `src/test/helpers.ts` の `SCHEMA` で、マイグレーションを足したらここも直す）
+- 繰り返し（Recurring）の複製は `src/test/recurring.test.ts`。`materializeRecurring(env, "YYYY-MM-DD")` に日付を渡して呼ぶので、日付を待たずに確かめられる
+
+### Recurring の cron をローカルで起こす
+
+本番の DB に触らず、0002 までの状態に既存データを置いてから 0003 を当てる → cron を起こす、まで通せる。
+
+```bash
+cd apps/shelf/api
+P=<scratchpad>/wrangler-state   # 使い捨ての置き場
+npx wrangler d1 migrations apply todo-shelf-db --local --persist-to $P
+npx wrangler dev --test-scheduled --port 8799 --persist-to $P &
+# Recurring にタスクを作って PATCH で repeat_unit / repeat_interval を付けてから
+curl -s "http://localhost:8799/__scheduled?cron=0+20+*+*+*"   # → "Ran scheduled event"
+# Shelf のセクションなしの先頭（position が最小）に複製が入り、元の期日が次の回へ進む
+```
+
+- ログに `{"recurring":"done","today":...,"created":N}` が出る。本番では Workers Logs で同じ行を探す
+- Web をこの API に向けるときは `VITE_API_URL=http://localhost:8799 VITE_API_SECRET=<.dev.vars の値> npx vite`
 
 ### API deploy 後の本番 smoke
 

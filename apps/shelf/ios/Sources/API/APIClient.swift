@@ -148,6 +148,16 @@ actor APIClient {
         return try decoder.decode(Task.self, from: data)
     }
 
+    /// unit と interval は両方そろえて送る。どちらも nil なら繰り返しを外す
+    func updateTaskRepeat(id: String, unit: String?, interval: Int?) async throws -> Task {
+        let body: [String: AnyCodable] = [
+            "repeat_unit": unit.map { AnyCodable($0) } ?? AnyCodable.null,
+            "repeat_interval": interval.map { AnyCodable($0) } ?? AnyCodable.null,
+        ]
+        let data = try await request("/tasks/\(id)", method: "PATCH", body: body)
+        return try decoder.decode(Task.self, from: data)
+    }
+
     func deleteTask(id: String) async throws {
         _ = try await request("/tasks/\(id)", method: "DELETE")
     }

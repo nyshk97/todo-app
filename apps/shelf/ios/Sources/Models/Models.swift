@@ -39,17 +39,22 @@ struct Task: Codable, Identifiable, Equatable {
     var position: Int
     var commentCount: Int
     var archivedAt: String?
+    /// 繰り返し（Recurring のタスクだけが持つ）。"day" / "week" / "month" / "year"
+    var repeatUnit: String?
+    var repeatInterval: Int?
     let createdAt: String
     let updatedAt: String
 
     init(
         id: String, projectId: String, sectionId: String?, title: String,
         dueDate: String?, position: Int, commentCount: Int, archivedAt: String?,
+        repeatUnit: String? = nil, repeatInterval: Int? = nil,
         createdAt: String, updatedAt: String
     ) {
         self.id = id; self.projectId = projectId; self.sectionId = sectionId
         self.title = title; self.dueDate = dueDate; self.position = position
         self.commentCount = commentCount; self.archivedAt = archivedAt
+        self.repeatUnit = repeatUnit; self.repeatInterval = repeatInterval
         self.createdAt = createdAt; self.updatedAt = updatedAt
     }
 
@@ -63,6 +68,8 @@ struct Task: Codable, Identifiable, Equatable {
         position = try c.decode(Int.self, forKey: .position)
         commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0
         archivedAt = try c.decodeIfPresent(String.self, forKey: .archivedAt)
+        repeatUnit = try c.decodeIfPresent(String.self, forKey: .repeatUnit)
+        repeatInterval = try c.decodeIfPresent(Int.self, forKey: .repeatInterval)
         createdAt = try c.decode(String.self, forKey: .createdAt)
         updatedAt = try c.decode(String.self, forKey: .updatedAt)
     }
@@ -74,6 +81,8 @@ struct Task: Codable, Identifiable, Equatable {
         case dueDate = "due_date"
         case commentCount = "comment_count"
         case archivedAt = "archived_at"
+        case repeatUnit = "repeat_unit"
+        case repeatInterval = "repeat_interval"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

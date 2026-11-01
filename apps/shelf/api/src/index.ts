@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Bindings } from "./lib/db";
+import { todayJST } from "./lib/db";
+import { materializeRecurring } from "./lib/recurrence";
 import { auth } from "./middleware/auth";
 import projects from "./routes/projects";
 import sections from "./routes/sections";
@@ -42,4 +44,10 @@ app.route("/", tasks);
 app.route("/", comments);
 app.route("/", attachments);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // 毎朝 JST 5:00（wrangler.toml の crons）に、期日が来た Recurring のタスクを Shelf へ複製する
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(materializeRecurring(env, todayJST()));
+  },
+} satisfies ExportedHandler<Bindings>;
