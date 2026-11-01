@@ -51,6 +51,11 @@ description = "todo: iOS アプリを実機に Release で入れて起動 (ペ�
 usage = 'arg "[device]" help="入れる端末（名前・iPhone / iPad・UDID の一部。all で全部）。実機が 1 台なら省略可" default=""'
 run = 'bash scripts/install-ios-device.sh todo "$usage_device"'
 
+[tasks."todo:ota"]
+description = "todo: iOS アプリをビルドして Tailscale 越しの OTA で配る（外出先でも iPhone の Safari から入る。1 つ前の版にも戻せる）"
+# 配る仕組みは nyshk97/ios-ota（brew 'nyshk97/tap/ios-ota'。mini で）
+run = 'bash scripts/generate-projects.sh >/dev/null && ios-ota publish todo --project apps/todo/ios/TodoApp.xcodeproj --scheme TodoApp --title "Todo iOS"'
+
 [tasks."todo:build:mac"]
 description = "todo: macOS アプリをビルドして起動"
 run = """
@@ -99,3 +104,8 @@ open apps/shelf/ios/Shelf.xcodeproj
 description = "shelf: iOS アプリを実機に Release で入れて起動 (ペアリング済みなら USB 不要・端末のロック解除が必要)"
 usage = 'arg "[device]" help="入れる端末（名前・iPhone / iPad・UDID の一部。all で全部）。実機が 1 台なら省略可" default=""'
 run = 'bash scripts/install-ios-device.sh shelf "$usage_device"'
+
+[tasks."shelf:ota"]
+description = "shelf: iOS アプリをビルドして Tailscale 越しの OTA で配る（外出先でも iPhone の Safari から入る。1 つ前の版にも戻せる）"
+# 配る仕組みは nyshk97/ios-ota（brew 'nyshk97/tap/ios-ota'。mini で）
+run = 'bash scripts/generate-projects.sh >/dev/null && ios-ota publish shelf --project apps/shelf/ios/Shelf.xcodeproj --scheme Shelf --title "Shelf iOS"'

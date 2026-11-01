@@ -48,6 +48,23 @@ sleep 10 && xcrun devicectl device info processes --device "$DEV" | grep "$PROJ"
 - 実機ビルドはシミュレータビルドと違って**署名・プロビジョニングまで解決する**ので、`.xcodeproj` の再生成やパス変更の後はこれを通しておくと Xcode で詰まらない
 - 以下は画面を見ないと判定できないのでユーザーに依頼する: 一覧の表示内容、タスクの追加・完了、ウィジェットの表示更新、shelf の「今日へ移動」が todo 側に反映されるか
 
+## 外出先の iPhone に入れる（OTA）
+
+`mise run shelf:ota` / `todo:ota`（mini で。nyshk97/ios-ota の `ios-ota publish` を呼ぶ。`ios-ota list` で配っている版、ビルドのログは `~/Library/Logs/ios-ota/<製品>.log`）。iPhone が同じ Wi-Fi に無く `*:device` が「ペアリング済みの実機が見つからない」（`devicectl list devices` で `unavailable`）のときに使う。
+
+```bash
+H=https://tsubasamac-mini.tail9fb38b.ts.net
+curl -s $H/ota/ | grep -o '<a href="[^"]*">[^<]*'           # アプリの一覧（shelf/・station/・todo/）
+curl -s $H/ota/shelf/ | grep -oE '(最新を入れる|1 つ前に戻す)'   # 2 回目からは「1 つ前に戻す」も出る
+# manifest が指す ipa が 200 か・ipa のプロファイルに iPhone が入っているか
+D=$(ls ~/Library/Application\ Support/ios-ota/shelf | grep '^20' | tail -1)
+T=$(mktemp -d); unzip -q ~/Library/Application\ Support/ios-ota/shelf/$D/Shelf.ipa -d $T
+security cms -D -i $T/Payload/Shelf.app/embedded.mobileprovision | grep -A3 ProvisionedDevices
+```
+
+- 入るかどうかの最後は iPhone の Safari で `https://tsubasamac-mini.tail9fb38b.ts.net/ota/shelf/` を開いて「最新を入れる」を押す（人の操作）
+- 配るサーバー（LaunchAgent `local.nyshk97.ios-ota`・127.0.0.1:7381）と置き場（`~/Library/Application Support/ios-ota/<アプリ>/`）は station など他の iOS アプリと共有（しくみは nyshk97/ios-ota の README）
+
 ---
 
 # todo（`apps/todo/`）

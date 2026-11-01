@@ -68,7 +68,7 @@ docs/
 - `contextMenu` は dimming バグがあるので使わない。タスク名タップで編集、ゴミ箱アイコンで即削除
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
 - iOS の `PendingOperation` 同期では、同期開始時に fetch した配列 snapshot を最後まで回さない。同期中に ViewModel 側で op が削除・相殺される race があるため、各 iteration で次の pending op を SwiftData から取り直す。HTTP 400/403/409 など再試行で解消しない op は先頭で詰まらせず、ユーザーに見える同期エラーを残して drop する
-- 実機インストール: 基本は `mise run todo:device`（`scripts/install-ios-device.sh`。Release でビルド → devicectl で転送 → 起動）。一度 USB でペアリングした端末なら同じ Wi-Fi で USB 不要、ただし端末のロック解除が要る（ロック中は「The developer disk image could not be mounted」で落ちる）。届かない端末（`tunnelState` が `unavailable`）は自動で外し、複数届くときは `mise run todo:device iPhone` のように指定する。Xcode で実機を選んで Cmd+R でもよい。有料 Apple Developer Program の Development profile は1年有効（2026-08 に embedded.mobileprovision の ExpirationDate で実測確認済み）。「約1週間で期限切れ」は無料 Apple ID（Personal Team）時代の制限で、現在は該当しない。長期運用向けに Ad Hoc export する場合: `mise run todo:build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Devices and Simulators に .ipa をドラッグ
+- 実機インストール: 基本は `mise run todo:device`（`scripts/install-ios-device.sh`。Release でビルド → devicectl で転送 → 起動）。一度 USB でペアリングした端末なら同じ Wi-Fi で USB 不要、ただし端末のロック解除が要る（ロック中は「The developer disk image could not be mounted」で落ちる）。届かない端末（`tunnelState` が `unavailable`）は自動で外し、複数届くときは `mise run todo:device iPhone` のように指定する。**外出中（同じ Wi-Fi に無い）なら `mise run todo:ota`**（mini で。自作のコマンド [nyshk97/ios-ota](https://github.com/nyshk97/ios-ota) を呼ぶ。返した URL `https://tsubasamac-mini.tail9fb38b.ts.net/ota/todo/` を iPhone の Safari で開いて「最新を入れる」。「1 つ前に戻す」も同じページ。Tailscale 越しに iPhone が取りに来るので回線を問わない。配るサーバーと置き場は station など他の iOS アプリと共有）。Xcode で実機を選んで Cmd+R でもよい。有料 Apple Developer Program の Development profile は1年有効（2026-08 に embedded.mobileprovision の ExpirationDate で実測確認済み）。「約1週間で期限切れ」は無料 Apple ID（Personal Team）時代の制限で、現在は該当しない。長期運用向けに Ad Hoc export する場合: `mise run todo:build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Devices and Simulators に .ipa をドラッグ
 - `GENERATE_INFOPLIST_FILE: true` と `info:` (path なし) は XcodeGen で併用不可。カスタム値は `Secrets.swift` の自動生成で対応
 - XcodeGen で新規ファイルを追加すると SourceKit が一時的に偽陽性エラー（`Cannot find type X in scope` 等）を出すが、これは `.xcodeproj` 未再生成によるもの。`bash scripts/generate-projects.sh` 後に解消する。多数表示されてもひるまず、最後に `xcodebuild ... -sdk iphonesimulator build` で実ビルドして確認する
 
@@ -122,7 +122,7 @@ docs/
 - API: `mise run shelf:deploy`（Cloudflare Workers）
 - Web: `mise run shelf:deploy:web`（Cloudflare Pages、Git連携なし・手動デプロイ）
 - DB マイグレーション: `mise run shelf:deploy:migrate`（`apps/shelf/api/migrations/` に SQL 追加後に実行）
-- iOS: `mise run shelf:device`（実機に Release で入れて起動。USB 不要・端末のロック解除が要る。詳細は todo の「実機インストール」）。Xcode で開くなら `mise run shelf:build:ios`（xcodegen でプロジェクト生成 → Xcode で開く → Cmd+R で実機ビルド）
+- iOS: `mise run shelf:device`（実機に Release で入れて起動。USB 不要・端末のロック解除が要る。詳細は todo の「実機インストール」）。外出中は `mise run shelf:ota`（`/ota/shelf/` を iPhone の Safari で開く）。Xcode で開くなら `mise run shelf:build:ios`（xcodegen でプロジェクト生成 → Xcode で開く → Cmd+R で実機ビルド）
 - `mise run shelf:test`（`apps/shelf/api` の vitest）は 2026-11-01 から全件通る（Tasks 系 9 件の失敗はテスト用スキーマに `archived_at` が無かったのが原因で、`src/test/helpers.ts` の `SCHEMA` に寄せて解消）。マイグレーションで列を足したら `SCHEMA` も直す
 
 ## API
