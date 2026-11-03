@@ -288,20 +288,19 @@ export function TaskDetail({
             </span>
           ) : (
             <>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => handleDueDateChange(e.target.value)}
-                style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid var(--border-standard)",
-                  borderRadius: "var(--radius-md)",
-                  color: status ? dueDateColors[status] : "var(--text-secondary)",
-                  padding: "4px 8px",
-                  fontSize: 13,
-                  outline: "none",
-                }}
-              />
+              <label className="due-date-field">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4.5" width="18" height="16.5" rx="2.5" />
+                  <path d="M16 2.5v4M8 2.5v4M3 10h18" />
+                </svg>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => handleDueDateChange(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                  style={{ color: status ? dueDateColors[status] : "var(--text-secondary)" }}
+                />
+              </label>
               {dueDate && (
                 <button
                   onClick={() => handleDueDateChange("")}
