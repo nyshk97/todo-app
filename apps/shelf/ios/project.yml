@@ -11,6 +11,8 @@ targets:
     platform: iOS
     sources:
       - Sources
+    dependencies:
+      - target: ShelfShareExtension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.shelf
@@ -24,3 +26,37 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+
+  # 共有シートの「Shelf」。API クライアントと Secrets はアプリ本体のものを使う
+  ShelfShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+        excludes:
+          - Info.plist
+      # 共有の中身の取り出しは todo の ShareExtension と同じものを使う
+      - path: ../../todo/ios/ShareExtension/SharedContent.swift
+      - path: Sources/API/APIClient.swift
+      - path: Sources/Models/Models.swift
+      - path: Sources/Secrets.swift
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Shelf
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.shelf.share
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "6.0"
+        DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER

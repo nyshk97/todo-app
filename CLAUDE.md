@@ -69,6 +69,7 @@ docs/
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する
 - iOS の `PendingOperation` 同期では、同期開始時に fetch した配列 snapshot を最後まで回さない。同期中に ViewModel 側で op が削除・相殺される race があるため、各 iteration で次の pending op を SwiftData から取り直す。HTTP 400/403/409 など再試行で解消しない op は先頭で詰まらせず、ユーザーに見える同期エラーを残して drop する
 - 実機インストール: 基本は `mise run todo:device`（`scripts/install-ios-device.sh`。Release でビルド → devicectl で転送 → 起動）。一度 USB でペアリングした端末なら同じ Wi-Fi で USB 不要、ただし端末のロック解除が要る（ロック中は「The developer disk image could not be mounted」で落ちる）。届かない端末（`tunnelState` が `unavailable`）は自動で外し、複数届くときは `mise run todo:device iPhone` のように指定する。**外出中（同じ Wi-Fi に無い）なら `mise run todo:ota`**（mini で。自作のコマンド [nyshk97/ios-ota](https://github.com/nyshk97/ios-ota) を呼ぶ。返した URL `https://tsubasamac-mini.tail9fb38b.ts.net/ota/todo/` を iPhone の Safari で開いて「最新を入れる」。「1 つ前に戻す」も同じページ。Tailscale 越しに iPhone が取りに来るので回線を問わない。配るサーバーと置き場は station など他の iOS アプリと共有）。Xcode で実機を選んで Cmd+R でもよい。有料 Apple Developer Program の Development profile は1年有効（2026-08 に embedded.mobileprovision の ExpirationDate で実測確認済み）。「約1週間で期限切れ」は無料 Apple ID（Personal Team）時代の制限で、現在は該当しない。長期運用向けに Ad Hoc export する場合: `mise run todo:build:ios` で Xcode を開き、Product > Archive → Distribute App > Release Testing (Ad Hoc) で .ipa を export → Devices and Simulators に .ipa をドラッグ
+- 共有シートの「Today」は `apps/todo/ios/ShareExtension/`（`TodoShareExtension`）。タイトルの末尾に URL を付けて今日のタスクとして API に直接 POST する（オフライン同期には乗せない）。`APIClient.swift`・`Models/Todo.swift`・`Secrets.swift` はアプリ本体のファイルをそのままビルドに入れている。共有の中身の取り出し（`SharedContent.swift`）は shelf の ShareExtension もこのファイルをビルドに入れている
 - `GENERATE_INFOPLIST_FILE: true` と `info:` (path なし) は XcodeGen で併用不可。カスタム値は `Secrets.swift` の自動生成で対応
 - XcodeGen で新規ファイルを追加すると SourceKit が一時的に偽陽性エラー（`Cannot find type X in scope` 等）を出すが、これは `.xcodeproj` 未再生成によるもの。`bash scripts/generate-projects.sh` 後に解消する。多数表示されてもひるまず、最後に `xcodebuild ... -sdk iphonesimulator build` で実ビルドして確認する
 
@@ -193,4 +194,6 @@ docs/
 - ジェスチャーに紐づく一時状態は `@GestureState` を使うとキャンセル時も自動リセットされる。手動管理の `@State` フラグは `.onEnded` が呼ばれない経路で汚染されるリスクあり
 - 新規 Swift ファイルを追加したら `xcodegen generate` を再実行してからビルドする（自動では Xcode プロジェクトに含まれない）
 - `xcodegen generate` 直後はハーネス側 SourceKit のキャッシュが古いまま「Cannot find type 'XX'」「Cannot find 'Theme' in scope」等を大量に出すことがあるが、実際の `xcodebuild` は通る。診断ノイズに振り回されて書き換えに走らず、`mise run shelf:build:ios` か `xcodebuild` で実ビルドを確認する
+- 共有シートの「Shelf」は `apps/shelf/ios/ShareExtension/`（`ShelfShareExtension`）。Shelf プロジェクトのセクションなしにタスクを作り、URL はコメントに入れる（2 リクエスト。コメントだけ失敗したら作ったタスクの id を覚えて、押し直しでコメントだけ送る）
+- `struct Section`（Models.swift）が SwiftUI の `Section` を shadow する。`Models.swift` を読み込む View で `Form` の中に `Section { }` を書くと「trailing closure passed to parameter of type 'FormStyleConfiguration'」になるので `SwiftUI.Section` と書く
 - プロジェクト内の `struct Task: Codable`（Models.swift）が Swift 標準の並行処理 `Task` を shadow する。非同期ブロックを起動する時は `Swift.Task { ... }` と修飾すること（素の `Task { ... }` は `Task(from: Decoder)` に解決されて "trailing closure passed to parameter of type 'any Decoder'" エラーになる）

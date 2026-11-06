@@ -13,6 +13,7 @@ targets:
       - Sources
     dependencies:
       - target: TodoWidgetExtension
+      - target: TodoShareExtension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todoapp
@@ -44,6 +45,38 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todoapp.widget
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: DEVELOPMENT_TEAM_PLACEHOLDER
+
+  # 共有シートの「Today」。API クライアントと Secrets はアプリ本体のものを使う
+  TodoShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+        excludes:
+          - Info.plist
+      - path: Sources/API/APIClient.swift
+      - path: Sources/Models/Todo.swift
+      - path: Sources/Secrets.swift
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Today
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todoapp.share
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: 1
         SWIFT_VERSION: "5.9"

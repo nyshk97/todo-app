@@ -48,6 +48,19 @@ sleep 10 && xcrun devicectl device info processes --device "$DEV" | grep "$PROJ"
 - 実機ビルドはシミュレータビルドと違って**署名・プロビジョニングまで解決する**ので、`.xcodeproj` の再生成やパス変更の後はこれを通しておくと Xcode で詰まらない
 - 以下は画面を見ないと判定できないのでユーザーに依頼する: 一覧の表示内容、タスクの追加・完了、ウィジェットの表示更新、shelf の「今日へ移動」が todo 側に反映されるか
 
+## 共有シート（Today / Shelf）
+
+各アプリの `ShareExtension/` が共有シートの「Today」（todo）・「Shelf」（shelf）になる。アプリに埋め込まれているかと、Info.plist の中身はビルド成果物で見られる。
+
+```bash
+DD=<derivedDataPath>/Build/Products/Debug-iphonesimulator
+ls $DD/TodoApp.app/PlugIns $DD/Shelf.app/PlugIns   # TodoShareExtension.appex / ShelfShareExtension.appex
+plutil -p $DD/Shelf.app/PlugIns/ShelfShareExtension.appex/Info.plist | grep -E "DisplayName|Principal|Supports"
+```
+
+- 共有シートからの動作は人に頼む（mini の Xcode には Simulator.app が無く、シミュレータの画面を操作できない）: X のポストと Safari のページをそれぞれ共有 → 「Today」「Shelf」が並ぶ → タイトルの初期値（X は URL しか渡さないのでページから取ったタイトル）→ 「追加」で todo は今日のタスク（末尾に URL）、shelf は Shelf のセクションなしにタスク＋URL のコメント
+- 共有シートに出ないときは、一度アプリ本体を起動する・共有シートの「その他」で有効にする
+
 ## 外出先の iPhone に入れる（OTA）
 
 `mise run shelf:ota` / `todo:ota`（mini で。nyshk97/ios-ota の `ios-ota publish` を呼ぶ。`ios-ota list` で配っている版、ビルドのログは `~/Library/Logs/ios-ota/<製品>.log`）。iPhone が同じ Wi-Fi に無く `*:device` が「ペアリング済みの実機が見つからない」（`devicectl list devices` で `unavailable`）のときに使う。
