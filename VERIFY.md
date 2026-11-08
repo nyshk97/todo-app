@@ -48,6 +48,23 @@ sleep 10 && xcrun devicectl device info processes --device "$DEV" | grep "$PROJ"
 - 実機ビルドはシミュレータビルドと違って**署名・プロビジョニングまで解決する**ので、`.xcodeproj` の再生成やパス変更の後はこれを通しておくと Xcode で詰まらない
 - 以下は画面を見ないと判定できないのでユーザーに依頼する: 一覧の表示内容、タスクの追加・完了、ウィジェットの表示更新、shelf の「今日へ移動」が todo 側に反映されるか
 
+## ウィジェットへの push（todo）
+
+書き込みのたびに API が APNs へ送った結果を Workers のログに `{"widgetPush":"sent"|"failed",...}` で出している。中身を変えない PATCH を1件送って、ログで APNs の応答を見る。
+
+```bash
+cd apps/todo/api && (npx wrangler tail todo-app-api --format json > /tmp/tail.log 2>&1 &); sleep 8
+set -a; . ../ios/.env; set +a; B=https://todo-app-api.d0ne1s-todo.workers.dev
+T=$(curl -s -H "Authorization: Bearer $API_SECRET" $B/todos | jq -c '[.todos[] | select(.completed|not)][0] | {id, title}')
+curl -s -X PATCH -H "Authorization: Bearer $API_SECRET" -H "Content-Type: application/json" \
+  -d "$(echo $T | jq -c '{title}')" $B/todos/$(echo $T | jq -r .id)
+sleep 6; pkill -f "wrangler tail todo-app-api"; grep -oE '\\"widgetPush[^}]*}' /tmp/tail.log
+```
+
+- `sent` → APNs が受け付けた（鍵・topic・トークンは正しい）。`failed` の `reason` が `DeviceTokenNotForTopic` なら topic、`InvalidProviderToken` なら鍵・キー ID・Team ID を疑う。登録済みのトークンは `npx wrangler d1 execute todo-app-db --remote --command "SELECT substr(token,1,8), updated_at FROM widget_push_tokens"`
+- 受け付けた後にウィジェットが読み直したかは、ウィジェットの読み直し（**日付なしの** `GET /todos`。アプリは `?date=` を付ける）がログに来るかと、ウィジェット右上の「HH:mm 更新」で見る。iOS が予算次第で遅らせる・捨てるので、届かないこと自体は失敗と限らない
+- Python の `urllib` は Cloudflare に 403 で弾かれる。API を叩くのは curl で
+
 ## 共有シート（Today / Shelf）
 
 各アプリの `ShareExtension/` が共有シートの「Today」（todo）・「Shelf」（shelf）になる。アプリに埋め込まれているかと、Info.plist の中身はビルド成果物で見られる。

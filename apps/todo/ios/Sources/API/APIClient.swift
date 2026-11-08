@@ -16,6 +16,11 @@ actor APIClient {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+        // このアプリは書き込みのあと自分でウィジェットを読み直すので、API からのウィジェット push は要らない
+        // （push も iOS の予算を食うので、Mac・shelf など外からの変更に取っておく）
+        if method != "GET" {
+            req.setValue("1", forHTTPHeaderField: "X-Skip-Widget-Push")
+        }
 
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")

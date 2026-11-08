@@ -64,6 +64,9 @@ docs/
 - Apple Developer Program（個人）で署名。Xcode の自動署名を使用
 - ウィジェットのバンドル ID: `com.d0ne1s.todoapp.widget`
 - WidgetKit 更新: ViewModel 内で `WidgetCenter.shared.reloadAllTimelines()` を呼ぶ
+- **Mac・shelf など iPhone の外で変えた分は WidgetKit push でウィジェットに知らせる**（2026-11 から）。ウィジェットが自分で読み直す間隔は iOS の予算次第で 1 時間以上空くため。ウィジェット（`Widget/TodoWidgetPush.swift`、iOS 26 以上）がトークンを `PUT /widget-push-tokens/:token` で登録し、API は GET 以外の書き込みが成功するたびに APNs へ `content-changed` を送る（`apps/todo/api/src/widgetPush.ts`）。iOS アプリ自身の書き込みは `X-Skip-Widget-Push` を付けて省く（アプリがその場で読み直すので、push の予算を外からの変更に取っておく）。push も iOS の予算の内で、即時の保証は無い。ウィジェット右上の「HH:mm 更新」でいつの中身かを見る
+  - APNs の鍵は Worker の secret（`APNS_KEY` = .p8 の中身・`APNS_KEY_ID`・`APNS_TEAM_ID`）。鍵は Sandbox 専用（実機は todo:device・todo:ota とも Development 署名なので sandbox に送る）。Ad Hoc / App Store 署名で配るようにしたら、Production の鍵を作って `APNS_HOST=api.push.apple.com` にする
+  - topic はアプリ本体の bundle ID + `.push-type.widgets`（`com.d0ne1s.todoapp.push-type.widgets`。2026-11-08 に APNs が 200 を返すことを確認）
 - `LazyVStack` で同じ ID を複数の `ForEach` で使うとキャッシュバグが起きる。完了済みタスクには `.id("done-\(todo.id)")` で回避
 - `contextMenu` は dimming バグがあるので使わない。タスク名タップで編集、ゴミ箱アイコンで即削除
 - `onTapGesture` と `onDrag` は共存可能だが、`onLongPressGesture` と `onDrag` は競合する

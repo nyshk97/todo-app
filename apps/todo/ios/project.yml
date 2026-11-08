@@ -31,6 +31,8 @@ targets:
   TodoWidgetExtension:
     type: app-extension
     platform: iOS
+    # WidgetKit push（WidgetPushHandler）が iOS 26 から
+    deploymentTarget: "26.0"
     sources:
       - path: Widget
         excludes:
@@ -42,6 +44,11 @@ targets:
         CFBundleDisplayName: TodoWidget
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    # WidgetKit push を受けるため。実機には Development 署名で入れる（todo:device・todo:ota とも）ので development
+    entitlements:
+      path: Widget/TodoWidget.entitlements
+      properties:
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.d0ne1s.todoapp.widget

@@ -41,6 +41,7 @@ struct TodoProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoEntry>) -> Void) {
         Task {
+            await WidgetPushRegistration.registerCurrentToken()
             let entry = await fetchEntry()
             let timeline = Timeline(entries: [entry], policy: .after(Self.nextUpdate(from: .now)))
             completion(timeline)
@@ -93,5 +94,6 @@ struct TodoWidget: Widget {
         .configurationDisplayName("Today's Tasks")
         .description("今日のタスク一覧を表示します")
         .supportedFamilies([.systemLarge])
+        .pushHandler(TodoWidgetPushHandler.self)
     }
 }

@@ -32,4 +32,23 @@ actor WidgetAPIClient {
         }
         return try JSONDecoder().decode(WidgetTodosResponse.self, from: data)
     }
+
+    func registerPushToken(_ token: String) async throws {
+        try await send("/widget-push-tokens/\(token)", method: "PUT")
+    }
+
+    func unregisterPushToken(_ token: String) async throws {
+        try await send("/widget-push-tokens/\(token)", method: "DELETE")
+    }
+
+    private func send(_ path: String, method: String) async throws {
+        var req = URLRequest(url: URL(string: "\(baseURL)\(path)")!)
+        req.httpMethod = method
+        req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
 }
