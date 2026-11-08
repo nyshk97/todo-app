@@ -3,6 +3,7 @@ import { Miniflare } from "miniflare";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
+import { generateKeyPairSync } from "node:crypto";
 import { yesterday } from "../date";
 
 let mf: Miniflare;
@@ -503,5 +504,200 @@ describe("API", () => {
       expect(after.todos).toHaveLength(1);
       expect(after.todos[0].title).toBe("今日の新しいタスク");
     });
+  });
+});
+
+describe("ウィジェットへの push", () => {
+  const TOKEN = "ab".repeat(32);
+  let apnsRequests: { url: string; headers: Record<string, string>; body: string }[];
+  let apnsStatus: number;
+  let apnsBody: string;
+
+  beforeEach(async () => {
+    apnsRequests = [];
+    apnsStatus = 200;
+    apnsBody = "";
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    const scriptPath = buildWorker();
+    mf = new Miniflare({
+      modules: true,
+      scriptPath,
+      d1Databases: { DB: "test-db" },
+      bindings: {
+        API_SECRET: "test-secret",
+        APNS_KEY: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+        APNS_KEY_ID: "KEYID12345",
+        APNS_TEAM_ID: "TEAMID1234",
+      },
+      compatibilityDate: "2025-04-01",
+      // APNs への送信を捕まえる
+      outboundService: async (req) => {
+        apnsRequests.push({
+          url: req.url,
+          headers: Object.fromEntries(req.headers),
+          body: await req.text(),
+        });
+        return new Response(apnsBody, { status: apnsStatus });
+      },
+    });
+
+    const db = await getDb();
+    await db.exec("CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, carried_over INTEGER NOT NULL DEFAULT 0, completed_at TEXT, duration INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
+    await db.exec("CREATE TABLE IF NOT EXISTS carry_overs (date TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')));");
+    await db.exec("CREATE TABLE IF NOT EXISTS widget_push_tokens (token TEXT PRIMARY KEY, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));");
+    await db.exec("DELETE FROM todos");
+    await db.exec("DELETE FROM carry_overs");
+    await db.exec("DELETE FROM widget_push_tokens");
+  });
+
+  afterEach(async () => {
+    await mf.dispose();
+  });
+
+  async function registerToken(token = TOKEN) {
+    return mf.dispatchFetch(`http://localhost/widget-push-tokens/${token}`, {
+      method: "PUT",
+      headers: AUTH,
+    });
+  }
+
+  // push は waitUntil で応答の後に送られるので、届くまで少し待つ
+  async function waitForApns(count: number) {
+    for (let i = 0; i < 50 && apnsRequests.length < count; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+
+  async function tokenCount() {
+    const row = await (await getDb())
+      .prepare("SELECT COUNT(*) AS n FROM widget_push_tokens")
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  }
+
+  it("トークンの登録は認証が要る", async () => {
+    const res = await mf.dispatchFetch(`http://localhost/widget-push-tokens/${TOKEN}`, {
+      method: "PUT",
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("16進数でないトークンは 400", async () => {
+    const res = await registerToken("not-a-token");
+    expect(res.status).toBe(400);
+  });
+
+  it("同じトークンを何度登録しても1行", async () => {
+    expect((await registerToken()).status).toBe(200);
+    expect((await registerToken()).status).toBe(200);
+    expect(await tokenCount()).toBe(1);
+  });
+
+  it("トークンを消せる", async () => {
+    await registerToken();
+    const res = await mf.dispatchFetch(`http://localhost/widget-push-tokens/${TOKEN}`, {
+      method: "DELETE",
+      headers: AUTH,
+    });
+    expect(res.status).toBe(200);
+    expect(await tokenCount()).toBe(0);
+  });
+
+  it("タスクを作ると APNs に widgets の push を送る", async () => {
+    await registerToken();
+    await createTodo("Mac で足したタスク");
+    await waitForApns(1);
+
+    expect(apnsRequests).toHaveLength(1);
+    const req = apnsRequests[0];
+    expect(req.url).toBe(`https://api.sandbox.push.apple.com/3/device/${TOKEN}`);
+    expect(req.headers["apns-push-type"]).toBe("widgets");
+    expect(req.headers["apns-topic"]).toBe("com.d0ne1s.todoapp.push-type.widgets");
+    expect(req.headers["authorization"]).toMatch(/^bearer [\w-]+\.[\w-]+\.[\w-]+$/);
+    expect(JSON.parse(req.body)).toEqual({ aps: { "content-changed": true } });
+
+    const [header, payload] = req.headers["authorization"]
+      .slice("bearer ".length)
+      .split(".")
+      .slice(0, 2)
+      .map((part) => JSON.parse(Buffer.from(part, "base64url").toString()));
+    expect(header).toEqual({ alg: "ES256", kid: "KEYID12345" });
+    expect(payload.iss).toBe("TEAMID1234");
+  });
+
+  it("更新・削除・並べ替えでも送る", async () => {
+    await registerToken();
+    const todo = await createTodo("A");
+    await waitForApns(1);
+    await mf.dispatchFetch(`http://localhost/todos/${todo.id}`, {
+      method: "PATCH",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ completed: true }),
+    });
+    await waitForApns(2);
+    await mf.dispatchFetch("http://localhost/todos", {
+      method: "PATCH",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ items: [{ id: todo.id, position: 0 }] }),
+    });
+    await waitForApns(3);
+    await mf.dispatchFetch(`http://localhost/todos/${todo.id}`, {
+      method: "DELETE",
+      headers: AUTH,
+    });
+    await waitForApns(4);
+    expect(apnsRequests).toHaveLength(4);
+  });
+
+  it("取得・失敗した書き込み・X-Skip-Widget-Push 付きの書き込みでは送らない", async () => {
+    await registerToken();
+    await getTodos();
+    await mf.dispatchFetch("http://localhost/todos", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ title: "" }),
+    });
+    const created = await mf.dispatchFetch("http://localhost/todos", {
+      method: "POST",
+      headers: { ...JSON_HEADERS, "X-Skip-Widget-Push": "1" },
+      body: JSON.stringify({ title: "iPhone で足したタスク" }),
+    });
+    expect(created.status).toBe(201);
+
+    // 送らないことを確かめるので、送る書き込みを最後に1つ入れて、それだけが届くことを見る
+    await createTodo("Mac で足したタスク");
+    await waitForApns(1);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(apnsRequests).toHaveLength(1);
+  });
+
+  it("トークンが無ければ送らない", async () => {
+    await createTodo("A");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(apnsRequests).toHaveLength(0);
+  });
+
+  it("APNs が 410 を返したトークンは消す", async () => {
+    await registerToken();
+    apnsStatus = 410;
+    apnsBody = JSON.stringify({ reason: "Unregistered" });
+    await createTodo("A");
+    await waitForApns(1);
+    for (let i = 0; i < 50 && (await tokenCount()) > 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(apnsRequests).toHaveLength(1);
+    expect(await tokenCount()).toBe(0);
+  });
+
+  it("APNs が別の理由で失敗したトークンは残す", async () => {
+    await registerToken();
+    apnsStatus = 400;
+    apnsBody = JSON.stringify({ reason: "DeviceTokenNotForTopic" });
+    await createTodo("A");
+    await waitForApns(1);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(apnsRequests).toHaveLength(1);
+    expect(await tokenCount()).toBe(1);
   });
 });
