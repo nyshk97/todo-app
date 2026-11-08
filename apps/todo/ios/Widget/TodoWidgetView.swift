@@ -78,10 +78,22 @@ struct TodoWidgetView: View {
                     .foregroundStyle(colors.textSecondary)
             }
             Spacer()
-            Text("\(entry.completedCount)/\(entry.totalCount)")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(colors.textSecondary)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(entry.completedCount)/\(entry.totalCount)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(colors.textSecondary)
+                // いつの時点の中身かを出す（止まっていても古いと分かるように）
+                Text("\(updatedTimeString) 更新")
+                    .font(.system(size: 11))
+                    .foregroundStyle(colors.textSecondary)
+            }
         }
+    }
+
+    private var updatedTimeString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: entry.date)
     }
 
     private var dateString: String {

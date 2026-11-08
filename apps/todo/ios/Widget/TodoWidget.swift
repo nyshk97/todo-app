@@ -42,10 +42,18 @@ struct TodoProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodoEntry>) -> Void) {
         Task {
             let entry = await fetchEntry()
-            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: .now)!
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            let timeline = Timeline(entries: [entry], policy: .after(Self.nextUpdate(from: .now)))
             completion(timeline)
         }
+    }
+
+    // 15 分後を希望するが、日付をまたぐときは 0 時過ぎに読み直す（前日のタスクと日付を出し続けないように）。
+    // どちらも iOS への希望で、実際の更新は iOS の予算次第で遅れる
+    static func nextUpdate(from now: Date) -> Date {
+        let calendar = Calendar.current
+        let regular = calendar.date(byAdding: .minute, value: 15, to: now)!
+        let nextMidnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now)!)
+        return min(regular, nextMidnight.addingTimeInterval(60))
     }
 
     private func fetchEntry() async -> TodoEntry {
