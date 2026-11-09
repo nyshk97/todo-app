@@ -134,6 +134,7 @@ docs/
 - 本番: https://todo-shelf-api.d0ne1s-todo.workers.dev
 - Web: https://todo-shelf-web.pages.dev
 - 認証: `Authorization: Bearer <API_SECRET>`
+- **スクリプトから叩くときは`User-Agent`を付ける**。Pythonの`urllib`の既定のままだと、Workerに届く前にCloudflareが`403`（本文`error code: 1010`、`Server: cloudflare`）を返す。APIのコードはUser-Agentを見ていないので、コードでは直せない（iOS・Webは普通のUser-Agentを送るので影響なし）。2026-11-09確認
 - Hono の `app.use("/xxx/*", auth)` は `/xxx`（ワイルドカードなしのベアパス）にマッチしない可能性がある。`GET /sections` のようなコレクション直下ルートを追加するときは `app.use("/xxx", auth)` も併記して認証漏れを防ぐ（index.ts の `/sections` 参照）
 - D1 の prepared statement で `null` をバインドしても値がクリアされない。`column = NULL` と raw SQL で書くこと
 - 日付は JST (UTC+9) で計算
