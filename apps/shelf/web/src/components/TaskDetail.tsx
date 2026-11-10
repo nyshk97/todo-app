@@ -21,7 +21,8 @@ interface TaskDetailProps {
 
 const dueDateColors: Record<string, string> = {
   overdue: "var(--color-red)",
-  soon: "var(--color-orange)",
+  today: "var(--color-orange)",
+  soon: "var(--color-yellow)",
   normal: "var(--text-quaternary)",
 };
 

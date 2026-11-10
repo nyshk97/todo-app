@@ -9,8 +9,9 @@ struct TaskRow: View {
         guard let dueDate = task.dueDate else { return .clear }
         switch DueDateBadge.computeStatus(dueDate) {
         case .overdue: return Theme.red.opacity(0.08)
-        case .soon: return Theme.orange.opacity(0.06)
-        case .normal: return .clear
+        case .today: return Theme.orange.opacity(0.06)
+        // 行の背景は今日までのものだけ。1〜3日後は日付の色だけで知らせる
+        case .soon, .normal: return .clear
         }
     }
 
@@ -84,13 +85,14 @@ struct DueDateBadge: View {
     private var badgeColor: Color {
         switch dueDateStatus {
         case .overdue: Theme.red
-        case .soon: Theme.orange
+        case .today: Theme.orange
+        case .soon: Theme.yellow
         case .normal: Theme.textQuaternary
         }
     }
 
     enum DueStatus {
-        case overdue, soon, normal
+        case overdue, today, soon, normal
     }
 
     static func computeStatus(_ dateString: String) -> DueStatus {
@@ -101,6 +103,7 @@ struct DueDateBadge: View {
         let now = Date()
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: date)).day ?? 0
         if days < 0 { return .overdue }
+        if days == 0 { return .today }
         if days <= 3 { return .soon }
         return .normal
     }

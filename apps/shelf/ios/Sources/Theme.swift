@@ -20,6 +20,7 @@ enum Theme {
 
     // Accents
     static let orange = Color(red: 0.961, green: 0.620, blue: 0.043)      // #f59e0b
+    static let yellow = Color(red: 0.980, green: 0.800, blue: 0.082)      // #facc15
     static let red = Color(red: 0.937, green: 0.267, blue: 0.267)         // #ef4444
     static let green = Color(red: 0.153, green: 0.651, blue: 0.267)       // #27a644
     static let accentBright = Color(red: 0.306, green: 0.522, blue: 1.0)  // #4e85ff

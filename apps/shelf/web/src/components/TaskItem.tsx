@@ -12,13 +12,20 @@ interface TaskItemProps {
 
 const dueDateColors: Record<string, string> = {
   overdue: "var(--color-red)",
-  soon: "var(--color-orange)",
+  today: "var(--color-orange)",
+  soon: "var(--color-yellow)",
   normal: "var(--text-quaternary)",
 };
 
+// 行の背景は今日までのものだけ。1〜3日後は日付の色だけで知らせる
 const dueDateBgColors: Record<string, string> = {
   overdue: "rgba(239, 68, 68, 0.08)",
-  soon: "rgba(245, 158, 11, 0.06)",
+  today: "rgba(245, 158, 11, 0.06)",
+};
+
+const dueDateHoverBgColors: Record<string, string> = {
+  overdue: "rgba(239, 68, 68, 0.12)",
+  today: "rgba(245, 158, 11, 0.10)",
 };
 
 export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
@@ -41,9 +48,7 @@ export function TaskItem({ task, onDelete, onClick }: TaskItemProps) {
   };
 
   const bgColor = (status && dueDateBgColors[status]) ?? "transparent";
-  const hoverBgColor = (status && dueDateBgColors[status])
-    ? status === "overdue" ? "rgba(239, 68, 68, 0.12)" : "rgba(245, 158, 11, 0.10)"
-    : "rgba(255,255,255,0.03)";
+  const hoverBgColor = (status && dueDateHoverBgColors[status]) ?? "rgba(255,255,255,0.03)";
 
   return (
     <div
