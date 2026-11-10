@@ -86,7 +86,7 @@ struct DueDateBadge: View {
         switch dueDateStatus {
         case .overdue: Theme.red
         case .today: Theme.orange
-        case .soon: Theme.yellow
+        case .soon: Theme.sky
         case .normal: Theme.textQuaternary
         }
     }

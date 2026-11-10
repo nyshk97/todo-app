@@ -10,7 +10,7 @@ export type DueDateStatus = "overdue" | "today" | "soon" | "normal" | null;
  * 期日の状態を判定する
  * - 過ぎている → "overdue" (赤)
  * - 当日 → "today" (オレンジ)
- * - 1〜3日後 → "soon" (黄)
+ * - 1〜3日後 → "soon" (水色)
  * - それ以外 → "normal"
  */
 export function getDueDateStatus(dueDate: string | null): DueDateStatus {
